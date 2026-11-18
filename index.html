@@ -1,0 +1,4341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="NEON//BREACH — Simulador de terminal hacker ciberpunk con misiones, rastreo y audio sintetizado. Desarrollado por Nayara Bastida (NBR).">
+<meta name="theme-color" content="#160511">
+<title>NEON//BREACH — Terminal Hacker Ciberpunk | NBR</title>
+<style>
+:root {
+  --font-mono: 'Fira Code', 'Cascadia Code', 'Courier New', Consolas, monospace;
+  --bg: #160511;
+  --bg-2: #2a0a20;
+  --panel: rgba(38, 9, 29, 0.82);
+  --panel-solid: #26091d;
+  --fg: #b9ffd1;
+  --fg-bright: #f1fff5;
+  --fg-dim: #81b996;
+  --muted: #4e7a60;
+  --accent: #ff8a2a;
+  --accent-2: #e95420;
+  --cyan: #8edcff;
+  --magenta: #ff5fa2;
+  --danger: #ff4b5f;
+  --border: rgba(255, 138, 42, 0.25);
+  --border-strong: rgba(255, 138, 42, 0.62);
+  --shadow: 0 0 28px rgba(255, 138, 42, 0.12), inset 0 0 70px rgba(185, 255, 209, 0.03);
+  --glow-a: rgba(233, 84, 32, 0.12);
+  --glow-b: rgba(119, 33, 111, 0.16);
+  --button-bg: rgba(255, 138, 42, 0.08);
+  --trace-good: #57ff9a;
+  --trace-warn: #ffb000;
+  --trace-danger: #ff4b5f;
+  --matrix: #ff8a2a;
+}
+body[data-theme="cyberpunk"] {
+  --bg: #05030c;
+  --bg-2: #0b0618;
+  --panel: rgba(10, 5, 27, 0.84);
+  --panel-solid: #0b0618;
+  --fg: #00f3ff;
+  --fg-bright: #d7fdff;
+  --fg-dim: #3a9db0;
+  --muted: #174450;
+  --accent: #ff2a6d;
+  --accent-2: #b967ff;
+  --cyan: #00f3ff;
+  --magenta: #ff2a6d;
+  --danger: #ff335f;
+  --border: rgba(0, 243, 255, 0.23);
+  --border-strong: rgba(255, 42, 109, 0.62);
+  --shadow: 0 0 30px rgba(255, 42, 109, 0.14), inset 0 0 90px rgba(0, 243, 255, 0.035);
+  --glow-a: rgba(255, 42, 109, 0.1);
+  --glow-b: rgba(0, 243, 255, 0.075);
+  --button-bg: rgba(0, 243, 255, 0.075);
+  --trace-good: #00f3ff;
+  --trace-warn: #ff2a6d;
+  --trace-danger: #ff335f;
+  --matrix: #00f3ff;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 12% 0%, var(--glow-a), transparent 38%),
+    radial-gradient(circle at 88% 100%, var(--glow-b), transparent 42%),
+    linear-gradient(160deg, var(--bg-2), var(--bg) 44%, #000 100%);
+  color: var(--fg);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-shadow: 0 0 6px color-mix(in srgb, currentColor 40%, transparent);
+}
+body::selection, body *::selection { background: var(--fg); color: var(--bg); text-shadow: none; }
+button, input { font-family: inherit; }
+#matrix {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.15;
+}
+#matrix-canvas { display: block; width: 100%; height: 100%; }
+.crt {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0, rgba(0, 0, 0, 0.28) 1px, transparent 1px, transparent 3px);
+  opacity: 0.34;
+  animation: crt-flicker 5.5s infinite;
+}
+.crt::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, transparent 42%, rgba(0, 0, 0, 0.45) 78%, rgba(0, 0, 0, 0.85) 100%);
+  box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.9);
+}
+@keyframes crt-flicker {
+  0%, 100% { opacity: 0.32; }
+  48% { opacity: 0.35; }
+  49% { opacity: 0.22; }
+  50% { opacity: 0.36; }
+  72% { opacity: 0.3; }
+}
+.app {
+  position: relative;
+  z-index: 2;
+  width: min(1600px, 100%);
+  height: 100vh;
+  height: 100dvh;
+  margin: 0 auto;
+  padding: clamp(8px, 1.3vw, 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.app.glitching { animation: glitch-shake 0.34s steps(2, end) 2; }
+.app.glitching .output { text-shadow: 2px 0 var(--danger), -2px 0 var(--cyan); }
+@keyframes glitch-shake {
+  0% { transform: translate(0, 0); filter: none; }
+  15% { transform: translate(-3px, 1px); filter: hue-rotate(18deg) saturate(1.6); }
+  30% { transform: translate(3px, -2px); filter: none; }
+  45% { transform: translate(-2px, 2px); filter: hue-rotate(-16deg); }
+  60% { transform: translate(2px, 1px); filter: none; }
+  80% { transform: translate(-1px, -1px); filter: saturate(1.8); }
+  100% { transform: translate(0, 0); filter: none; }
+}
+.hud {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--panel), rgba(0, 0, 0, 0.42));
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.55), inset 0 0 30px var(--glow-b);
+  backdrop-filter: blur(6px);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.hud-brand {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-right: auto;
+  min-width: 160px;
+}
+.logo {
+  font-weight: 700;
+  color: var(--fg-bright);
+  text-shadow: 0 0 10px var(--fg), 0 0 26px var(--glow-a);
+  letter-spacing: 0.12em;
+}
+.version { color: var(--muted); font-size: 9.5px; }
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--fg-dim);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  white-space: nowrap;
+}
+.hud-chip strong { color: var(--fg); font-weight: 600; text-shadow: 0 0 8px var(--glow-a); }
+button.hud-chip { cursor: pointer; border-color: var(--border); transition: border-color 0.2s, background 0.2s, color 0.2s; }
+button.hud-chip:hover { border-color: var(--fg); color: var(--fg-bright); background: var(--button-bg); }
+button.hud-chip:focus-visible { outline: 1px solid var(--accent); outline-offset: 2px; }
+.hud-trace { flex: 1 1 190px; min-width: 150px; max-width: 320px; display: flex; flex-direction: column; gap: 3px; }
+.hud-label { display: flex; justify-content: space-between; gap: 10px; color: var(--fg-dim); }
+.hud-label span:last-child { color: var(--fg); }
+.trace-track {
+  position: relative;
+  height: 7px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.trace-track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0, transparent 11px, rgba(0, 0, 0, 0.5) 11px, rgba(0, 0, 0, 0.5) 12px);
+  pointer-events: none;
+}
+#trace-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--trace-good), var(--trace-warn));
+  box-shadow: 0 0 10px var(--trace-good);
+  transition: width 0.35s ease, background 0.35s ease;
+}
+body.trace-warning #trace-bar { background: linear-gradient(90deg, var(--trace-warn), var(--danger)); animation: trace-pulse 0.9s infinite; }
+body.trace-critical #trace-bar { background: var(--danger); box-shadow: 0 0 14px var(--danger); }
+body.trace-warning .hud-label span:last-child { color: var(--accent); }
+body.trace-critical .hud-label span:last-child { color: var(--danger); animation: text-blink 0.7s steps(2, end) infinite; }
+@keyframes trace-pulse { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.6); } }
+@keyframes text-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.terminal {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 16%),
+    linear-gradient(180deg, var(--panel), rgba(0, 0, 0, 0.62));
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.terminal::before, .terminal::after {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  border-color: var(--fg);
+  opacity: 0.65;
+}
+.terminal::before { top: 5px; left: 5px; border-top: 1px solid; border-left: 1px solid; }
+.terminal::after { right: 5px; bottom: 5px; border-right: 1px solid; border-bottom: 1px solid; }
+.terminal.glitching::after {
+  width: auto;
+  height: auto;
+  inset: 0;
+  border: 0;
+  background: linear-gradient(90deg, transparent 0 18%, rgba(255, 47, 69, 0.22) 18% 20%, transparent 20% 61%, rgba(0, 229, 255, 0.2) 61% 63%, transparent 63%);
+  mix-blend-mode: screen;
+  animation: glitch-scan 0.32s steps(2, end) 2;
+  opacity: 1;
+}
+@keyframes glitch-scan {
+  0% { transform: translateX(-6px); }
+  50% { transform: translateX(8px); }
+  100% { transform: translateX(0); }
+}
+.output {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 18px 20px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fg-dim) transparent;
+}
+.output::-webkit-scrollbar { width: 8px; }
+.output::-webkit-scrollbar-track { background: transparent; }
+.output::-webkit-scrollbar-thumb { background: var(--muted); border: 1px solid var(--border); }
+.output::-webkit-scrollbar-thumb:hover { background: var(--fg-dim); }
+.line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+  animation: line-in 0.16s ease-out;
+}
+.line-ascii {
+  white-space: pre;
+  overflow-x: auto;
+  font-size: clamp(4px, 0.83vw, 11px);
+  line-height: 1.04;
+  color: var(--fg);
+  text-shadow: 0 0 12px var(--fg), 0 0 30px var(--glow-a);
+  padding: 2px 0 5px;
+  animation: none;
+}
+.line-title { color: var(--fg-bright); font-weight: 700; letter-spacing: 0.13em; text-shadow: 0 0 10px var(--fg); }
+.line-accent { color: var(--accent); }
+.line-success { color: var(--fg-bright); text-shadow: 0 0 8px var(--fg); }
+.line-error { color: var(--danger); text-shadow: 0 0 8px rgba(255, 47, 69, 0.55); }
+.line-warn { color: var(--accent); text-shadow: 0 0 8px rgba(255, 176, 0, 0.35); }
+.line-info { color: var(--fg-dim); }
+.line-dim { color: var(--muted); }
+.line-mail { color: var(--cyan); }
+.line-hash { color: var(--magenta); overflow-wrap: anywhere; }
+.line-command { color: var(--fg-bright); }
+.line-path { color: var(--accent); }
+.line-badge { color: var(--bg); background: var(--fg); padding: 0 5px; text-shadow: none; font-weight: 700; }
+@keyframes line-in { from { opacity: 0; transform: translateY(2px); } to { opacity: 1; transform: none; } }
+.input-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.38);
+}
+.prompt {
+  color: var(--accent);
+  white-space: nowrap;
+  text-shadow: 0 0 9px rgba(255, 176, 0, 0.4);
+  user-select: none;
+}
+#command-input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--fg-bright);
+  font-size: clamp(12px, 1.45vw, 15px);
+  caret-color: var(--fg);
+  text-shadow: 0 0 6px var(--glow-a);
+}
+#command-input::placeholder { color: var(--muted); opacity: 0.9; }
+#command-input:disabled { color: var(--danger); cursor: not-allowed; }
+.terminal-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.035);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--muted);
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.conn-status { color: var(--fg-dim); white-space: nowrap; }
+.conn-status.remote { color: var(--cyan); text-shadow: 0 0 8px rgba(0, 229, 255, 0.4); }
+.status-hint { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: right; }
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.88) 75%),
+    rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  overflow-y: auto;
+}
+.hidden { display: none !important; }
+.boot-panel, .modal-panel {
+  position: relative;
+  width: min(880px, 100%);
+  max-height: 92dvh;
+  overflow-y: auto;
+  padding: clamp(18px, 3.4vw, 38px);
+  border: 1px solid var(--border-strong);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.025), transparent 35%),
+    linear-gradient(180deg, var(--bg-2), rgba(0, 0, 0, 0.94));
+  box-shadow: 0 0 60px var(--glow-a), 0 0 0 1px rgba(0, 0, 0, 0.6) inset;
+  animation: panel-in 0.35s ease-out;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fg-dim) transparent;
+}
+@keyframes panel-in { from { opacity: 0; transform: translateY(10px) scale(0.99); } to { opacity: 1; transform: none; } }
+.boot-panel::before, .modal-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 70px;
+  height: 2px;
+  background: var(--fg);
+  box-shadow: 0 0 14px var(--fg);
+}
+.boot-ascii {
+  margin: 0 0 12px;
+  color: var(--fg);
+  font-family: var(--font-mono);
+  font-size: clamp(4px, 1.1vw, 11px);
+  line-height: 1.06;
+  text-shadow: 0 0 14px var(--fg);
+  overflow-x: auto;
+  white-space: pre;
+}
+.boot-kicker { margin: 0; color: var(--accent); letter-spacing: 0.18em; text-transform: uppercase; font-size: 11px; }
+.boot-author { margin: 6px 0 20px; color: var(--fg-dim); font-size: 12px; letter-spacing: 0.06em; }
+.boot-status {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border-left: 2px solid var(--fg);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--fg-bright);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.boot-note { margin: 16px 0 0; color: var(--muted); font-size: 10px; letter-spacing: 0.05em; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border: 1px solid var(--border-strong);
+  background: var(--button-bg);
+  color: var(--fg);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s, border-color 0.2s, transform 0.1s;
+}
+.btn:hover { background: var(--fg); color: var(--bg); box-shadow: 0 0 24px var(--glow-a); text-shadow: none; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { border-color: var(--fg); box-shadow: 0 0 18px var(--glow-a), inset 0 0 18px rgba(0, 0, 0, 0.3); }
+.btn.primary:hover { box-shadow: 0 0 30px var(--glow-a); }
+.btn.danger { border-color: var(--danger); color: var(--danger); }
+.btn.danger:hover { background: var(--danger); color: #000; }
+.btn.ghost { border-color: var(--border); color: var(--fg-dim); }
+.btn[disabled] { opacity: 0.35; cursor: not-allowed; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.modal-title { color: var(--fg-bright); font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; }
+.modal-close {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg-dim);
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.modal-close:hover { border-color: var(--danger); color: var(--danger); }
+.tutorial-content { min-height: 250px; color: var(--fg-dim); font-size: 12.5px; line-height: 1.7; }
+.tutorial-content h3 { margin: 0 0 10px; color: var(--fg-bright); font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
+.tutorial-content p { margin: 0 0 10px; }
+.tutorial-content ul { margin: 0 0 12px; padding-left: 20px; }
+.tutorial-content li { margin-bottom: 5px; }
+.tutorial-content code {
+  color: var(--accent);
+  background: rgba(0, 0, 0, 0.42);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  white-space: nowrap;
+}
+.tutorial-content strong { color: var(--fg); font-weight: 600; }
+.tutorial-content .callout {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--accent);
+  background: rgba(0, 0, 0, 0.34);
+  color: var(--fg-dim);
+}
+.tutorial-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 16px; border-top: 1px solid var(--border); margin-top: 16px; }
+.tutorial-dots { display: flex; gap: 6px; }
+.tutorial-dots span { width: 18px; height: 3px; background: var(--muted); }
+.tutorial-dots span.active { background: var(--fg); box-shadow: 0 0 8px var(--fg); }
+.tutorial-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.victory-panel { text-align: center; }
+.victory-title { margin: 10px 0 8px; color: var(--fg-bright); font-size: clamp(22px, 4.4vw, 42px); line-height: 1.1; letter-spacing: 0.12em; text-shadow: 0 0 20px var(--fg); }
+.victory-sub { margin: 0 0 20px; color: var(--accent); font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; }
+.victory-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin: 18px 0 22px; text-align: left; }
+.victory-stat { padding: 10px 12px; border: 1px solid var(--border); background: rgba(0, 0, 0, 0.32); }
+.victory-stat span { display: block; color: var(--muted); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; }
+.victory-stat strong { display: block; margin-top: 4px; color: var(--fg); font-size: 13px; overflow-wrap: anywhere; }
+.victory-ask { margin: 0 0 12px; color: var(--fg-dim); font-size: 12px; letter-spacing: 0.05em; }
+.victory-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.lock-overlay {
+  z-index: 350;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 0, 30, 0.055) 0, rgba(255, 0, 30, 0.055) 2px, transparent 2px, transparent 6px),
+    radial-gradient(circle at 50% 42%, rgba(255, 20, 45, 0.22), rgba(0, 0, 0, 0.96) 72%);
+  animation: lock-flash 1.15s steps(2, end) infinite;
+}
+@keyframes lock-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.86; } }
+.lock-panel {
+  width: min(680px, 100%);
+  padding: clamp(22px, 5vw, 48px) clamp(16px, 4vw, 38px);
+  border: 1px solid var(--danger);
+  background: linear-gradient(180deg, rgba(30, 0, 6, 0.92), rgba(0, 0, 0, 0.96));
+  box-shadow: 0 0 70px rgba(255, 47, 69, 0.28), inset 0 0 60px rgba(255, 47, 69, 0.08);
+  text-align: center;
+  animation: lock-shake 0.5s steps(2, end) 3;
+}
+@keyframes lock-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-4px, 1px); }
+  75% { transform: translate(4px, -1px); }
+}
+.lock-kicker { margin: 0 0 8px; color: var(--danger); font-size: 11px; letter-spacing: 0.24em; text-transform: uppercase; animation: text-blink 0.8s steps(2, end) infinite; }
+.lock-title { margin: 0; color: #ff5566; font-size: clamp(20px, 4.8vw, 38px); letter-spacing: 0.14em; line-height: 1.15; text-shadow: 0 0 20px rgba(255, 47, 69, 0.8); }
+.lock-copy { margin: 14px auto 18px; max-width: 480px; color: #ff9aa8; font-size: 12px; line-height: 1.7; }
+.lock-countdown { color: #fff; font-size: clamp(48px, 12vw, 96px); line-height: 1; letter-spacing: 0.08em; text-shadow: 0 0 20px var(--danger), 0 0 50px rgba(255, 47, 69, 0.5); }
+.lock-track { height: 8px; margin: 18px auto 12px; max-width: 440px; border: 1px solid rgba(255, 47, 69, 0.55); background: rgba(0, 0, 0, 0.6); }
+#lock-progress { height: 100%; width: 100%; background: var(--danger); box-shadow: 0 0 12px var(--danger); transition: width 0.35s linear; }
+.lock-note { margin: 0; color: #ff6677; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+.toast-container { position: fixed; right: 18px; bottom: 18px; z-index: 450; display: flex; flex-direction: column; gap: 8px; max-width: min(340px, calc(100vw - 36px)); pointer-events: none; }
+.toast {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--fg);
+  background: rgba(0, 0, 0, 0.88);
+  color: var(--fg);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.6);
+  animation: toast-in 0.22s ease-out;
+  text-transform: uppercase;
+}
+.toast.warn { border-left-color: var(--accent); color: var(--accent); }
+.toast.error { border-left-color: var(--danger); color: var(--danger); }
+.toast.success { border-left-color: var(--fg); color: var(--fg-bright); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+@media (max-width: 900px) {
+  .hud { font-size: 9.5px; gap: 5px 8px; padding: 6px 8px; }
+  .hud-brand { width: 100%; margin-right: 0; justify-content: space-between; }
+  .hud-trace { flex: 1 1 120px; min-width: 120px; max-width: none; }
+  .output { padding: 12px 12px 8px; }
+  .input-form { padding: 8px 12px; }
+  .terminal-status { padding: 4px 12px; font-size: 8.5px; }
+  .status-hint { max-width: 55vw; }
+  .boot-panel, .modal-panel { padding: 18px; }
+}
+@media (max-width: 560px) {
+  .app { padding: 6px; }
+  .hud-chip { padding: 3px 5px; }
+  .logo { font-size: 10px; }
+  .terminal-status .status-hint { display: none; }
+  .terminal-status { justify-content: center; }
+  .tutorial-content { min-height: 0; font-size: 11.5px; }
+  .victory-actions .btn { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
+  #matrix { display: none; }
+}
+</style>
+</head>
+<body data-theme="ubuntu">
+<div id="matrix" aria-hidden="true"><canvas id="matrix-canvas"></canvas></div>
+<div class="crt" aria-hidden="true"></div>
+
+<div class="app" id="app">
+  <header class="hud" id="hud">
+    <div class="hud-brand">
+      <span class="logo">NBR://NEON_BREACH</span>
+      <span class="version">v1.0</span>
+    </div>
+    <button type="button" class="hud-chip" id="theme-chip" title="Cambiar tema visual">TEMA <strong id="theme-label">UBUNTU</strong></button>
+    <div class="hud-trace" title="Nivel de rastreo defensivo">
+      <div class="hud-label"><span>TRAZA</span><span id="trace-value">0%</span></div>
+      <div class="trace-track"><div id="trace-bar"></div></div>
+    </div>
+    <div class="hud-chip">DIFICULTAD <strong id="difficulty-label">NORMAL</strong></div>
+    <div class="hud-chip">MISIONES <strong id="mission-label">0%</strong></div>
+    <div class="hud-chip">TIEMPO <strong id="timer-label">00:00:00</strong></div>
+    <button type="button" class="hud-chip" id="sound-chip" aria-pressed="true" title="Activar o silenciar el audio">SONIDO <strong id="sound-label">ON</strong></button>
+  </header>
+
+  <main class="terminal" id="terminal" aria-label="Terminal de intrusión">
+    <div class="output" id="output" role="log" aria-live="polite" aria-relevant="additions"></div>
+    <form class="input-form" id="input-form" autocomplete="off">
+      <label class="prompt" id="prompt-label" for="command-input">ghost@nbr:~$</label>
+      <input id="command-input" type="text" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="Escribe un comando..." aria-label="Entrada de comandos" disabled>
+    </form>
+    <div class="terminal-status">
+      <span class="conn-status" id="conn-status">LOCAL // SIN CONEXIÓN</span>
+      <span class="status-hint" id="status-hint">TAB autocompleta · ↑↓ historial · help para comandos</span>
+    </div>
+  </main>
+</div>
+
+<div class="overlay" id="boot-overlay" role="dialog" aria-modal="true" aria-labelledby="boot-title">
+  <div class="boot-panel">
+    <pre class="boot-ascii" id="boot-ascii" aria-hidden="true"></pre>
+    <p class="boot-kicker" id="boot-title">Simulador de intrusión · Terminal ciberpunk</p>
+    <p class="boot-author">Desarrollado por Nayara Bastida (NBR)</p>
+    <p class="boot-status" id="boot-status">Inicializando entorno seguro...</p>
+    <button type="button" class="btn primary" id="boot-button">INICIAR SESIÓN</button>
+    <p class="boot-note">Audio sintetizado con Web Audio API · Progreso guardado en localStorage · Sin dependencias externas</p>
+  </div>
+</div>
+
+<div class="overlay hidden" id="tutorial-overlay" role="dialog" aria-modal="true" aria-labelledby="tutorial-title">
+  <div class="modal-panel">
+    <div class="modal-head">
+      <span class="modal-title" id="tutorial-title">Manual de operaciones // NBR</span>
+      <button type="button" class="modal-close" id="tutorial-close" aria-label="Cerrar tutorial">×</button>
+    </div>
+    <div class="tutorial-content" id="tutorial-content"></div>
+    <div class="tutorial-footer">
+      <div class="tutorial-dots" id="tutorial-dots"></div>
+      <div class="tutorial-actions">
+        <button type="button" class="btn ghost" id="tutorial-prev">ANTERIOR</button>
+        <button type="button" class="btn" id="tutorial-next">SIGUIENTE</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="victory-overlay" role="dialog" aria-modal="true" aria-labelledby="victory-title">
+  <div class="modal-panel victory-panel">
+    <p class="victory-sub">Protocolo Cero completado</p>
+    <h2 class="victory-title" id="victory-title">LA RED ES TUYA</h2>
+    <p class="lock-copy" style="color: var(--fg-dim)">Todos los contratos han sido ejecutados. NBR registra tu firma en el núcleo. La red volverá a levantarse: elige la presión defensiva para una nueva incursión.</p>
+    <div class="victory-stats" id="victory-stats"></div>
+    <p class="victory-ask">Selecciona dificultad para volver a jugar</p>
+    <div class="victory-actions">
+      <button type="button" class="btn" data-difficulty="facil">FÁCIL</button>
+      <button type="button" class="btn" data-difficulty="normal">NORMAL</button>
+      <button type="button" class="btn danger" data-difficulty="dificil">DIFÍCIL</button>
+      <button type="button" class="btn ghost" id="victory-close">SEGUIR EXPLORANDO</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden lock-overlay" id="lock-overlay" role="alertdialog" aria-modal="true" aria-labelledby="lock-title">
+  <div class="lock-panel">
+    <p class="lock-kicker">[!] Violación de seguridad detectada [!]</p>
+    <h2 class="lock-title" id="lock-title">ACCESO BLOQUEADO</h2>
+    <p class="lock-copy">La red ha completado el rastreo de tu identidad. La terminal permanecerá aislada mientras los defensores barren el nodo. No cierres la sesión: el bloqueo se resolverá automáticamente.</p>
+    <div class="lock-countdown" id="lock-countdown">00:45</div>
+    <div class="lock-track"><div id="lock-progress"></div></div>
+    <p class="lock-note" id="lock-note">Protocolo de contención activo · Nivel de calor incrementado al liberar</p>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container" aria-live="polite"></div>
+
+<noscript>
+  <div class="overlay">
+    <div class="boot-panel">
+      <p class="boot-status">Esta terminal necesita JavaScript activado para ejecutar el simulador.</p>
+    </div>
+  </div>
+</noscript>
+
+<script>
+/**
+ * @typedef {'ubuntu'|'cyberpunk'} ThemeName
+ * @typedef {'facil'|'normal'|'dificil'} DifficultyName
+ * @typedef {Object} MissionStage
+ * @property {string} id
+ * @property {string} label
+ * @property {string} hint
+ * @typedef {Object} MissionProgress
+ * @property {number} stage
+ * @property {boolean} completed
+ * @property {boolean} read
+ * @typedef {Object} MissionDef
+ * @property {string} id
+ * @property {number} mailId
+ * @property {number} nextMailId
+ * @property {string} title
+ * @property {string} codename
+ * @property {string} ip
+ * @property {string} hash
+ * @property {string} [hash2]
+ * @property {string} file
+ * @property {string} filePath
+ * @property {string} summary
+ * @property {MissionStage[]} stages
+ * @typedef {Object} MailMessage
+ * @property {number} id
+ * @property {string} from
+ * @property {string} subject
+ * @property {string} date
+ * @property {string} missionId
+ * @property {string} body
+ * @typedef {Object} NodeInfo
+ * @property {string} name
+ * @property {string} missionId
+ * @property {string} ports
+ * @property {string} risk
+ * @typedef {Object} DownloadRecord
+ * @property {string} missionId
+ * @property {string} name
+ * @property {string} path
+ * @property {string} content
+ * @property {string} at
+ * @typedef {Object} GameFiles
+ * @property {DownloadRecord[]} downloads
+ * @property {number} logsCleared
+ * @property {string[]} discovered
+ * @typedef {Object} MailState
+ * @property {number} unlocked
+ * @property {number[]} read
+ * @typedef {Object} GameStats
+ * @property {number} commands
+ * @property {number} errors
+ * @property {number} locks
+ * @property {number} missions
+ * @property {number} cracked
+ * @typedef {Object} GameState
+ * @property {number} version
+ * @property {ThemeName} theme
+ * @property {DifficultyName} difficulty
+ * @property {boolean} sound
+ * @property {number} trace
+ * @property {number} heat
+ * @property {number} elapsedMs
+ * @property {number} lastSavedAt
+ * @property {boolean} booted
+ * @property {string[]} cwd
+ * @property {string[]} remoteCwd
+ * @property {string|null} connectedIp
+ * @property {Record<string, MissionProgress>} missions
+ * @property {MailState} mail
+ * @property {GameFiles} files
+ * @property {string[]} history
+ * @property {GameStats} stats
+ * @property {boolean} tutorialSeen
+ * @property {boolean} victoryShown
+ * @property {number} lockUntil
+ * @property {number} traceWarnLevel
+ * @typedef {Object} VfsFile
+ * @property {'file'} type
+ * @property {string|(()=>string)} content
+ * @property {string} [mode]
+ * @property {boolean} [hidden]
+ * @typedef {Object} VfsDir
+ * @property {'dir'} type
+ * @property {Record<string, VfsNode>} children
+ * @property {string} [mode]
+ * @property {boolean} [hidden]
+ * @typedef {VfsFile|VfsDir} VfsNode
+ * @typedef {Object} CommandSpec
+ * @property {string} name
+ * @property {string[]} aliases
+ * @property {string} category
+ * @property {string} summary
+ * @property {string} usage
+ * @property {string} description
+ * @property {string[]} parameters
+ * @property {string[]} examples
+ * @property {string[]} seeAlso
+ * @property {(args:string[])=>void} run
+ * @property {((args:string[], token:string)=>string[])|undefined} [complete]
+ * @typedef {Object} DifficultyConfig
+ * @property {string} label
+ * @property {number} rate
+ * @property {number} error
+ * @property {number} lock
+ * @property {string} brief
+ */
+
+const SAVE_KEY = 'nbr_neon_breach_save_v1';
+const SAVE_VERSION = 1;
+const HISTORY_LIMIT = 100;
+
+/** @type {Record<ThemeName, {label:string, matrix:string}>} */
+const THEMES = {
+  ubuntu: { label: 'UBUNTU', matrix: '#ff8a2a' },
+  cyberpunk: { label: 'CYBERPUNK', matrix: '#00f3ff' }
+};
+
+/** @type {Record<DifficultyName, DifficultyConfig>} */
+const DIFFICULTIES = {
+  facil: { label: 'FÁCIL', rate: 0.06, error: 1.5, lock: 30, brief: 'Rastreo lento y bloqueo de 30 segundos.' },
+  normal: { label: 'NORMAL', rate: 0.12, error: 2.5, lock: 45, brief: 'Rastreo equilibrado y bloqueo de 45 segundos.' },
+  dificil: { label: 'DIFÍCIL', rate: 0.2, error: 4, lock: 60, brief: 'Rastreo agresivo y bloqueo de 60 segundos.' }
+};
+
+const ASCII_BANNER = String.raw`
+ _   _ _____ ___  _   _   ____  ____  _____    _    ____ _   _ 
+| \ | | ____/ _ \| \ | | | __ )|  _ \| ____|  / \  / ___| | | |
+|  \| |  _|| | | |  \| | |  _ \| |_) |  _|   / _ \| |   | |_| |
+| |\  | |__| |_| | |\  | | |_) |  _ <| |___ / ___ \ |___|  _  |
+|_| \_|_____\___/|_| \_| |____/|_| \_\_____/_/   \_\____|_| |_|
+`;
+
+/** @type {MissionDef[]} */
+const MISSIONS = [
+  {
+    id: 'm1',
+    mailId: 1,
+    nextMailId: 2,
+    title: 'PRIMER CONTACTO',
+    codename: 'HELIX',
+    ip: '10.42.0.13',
+    hash: '7f3a91c4e8b25d06a1f9c3e77b40d2aa',
+    file: 'clientes.dat',
+    filePath: '/data/clientes.dat',
+    summary: 'Infiltra HELIX, recupera la credencial del operador y extrae la base de clientes.',
+    stages: [
+      { id: 'read', label: 'Abrir el contrato', hint: 'Ejecuta "mail" para ver la bandeja y después "mail read 1" para abrir el contrato.' },
+      { id: 'scan', label: 'Escanear la red', hint: 'Ejecuta "netscan" para localizar el nodo HELIX (10.42.0.13).' },
+      { id: 'connect', label: 'Conectar con HELIX', hint: 'Ejecuta "connect 10.42.0.13" para abrir el túnel remoto.' },
+      { id: 'hash', label: 'Localizar el hash', hint: 'Conectado a HELIX, ejecuta "ls /home/operator" y luego "cat /home/operator/access.hash".' },
+      { id: 'crack', label: 'Descifrar la credencial', hint: 'Copia el hash de access.hash y ejecuta "crack <hash>".' },
+      { id: 'download', label: 'Extraer clientes.dat', hint: 'Ejecuta "download /data/clientes.dat" para traer el archivo a tu equipo.' },
+      { id: 'clean', label: 'Borrar las huellas', hint: 'Ejecuta "logs" para purgar los registros y reducir la traza.' }
+    ]
+  },
+  {
+    id: 'm2',
+    mailId: 2,
+    nextMailId: 3,
+    title: 'FANTASMA EN EL NÚCLEO',
+    codename: 'CORE-7',
+    ip: '172.16.4.20',
+    hash: 'b4e1d7a90c2f8365aa47e19d5c0b62ff',
+    file: 'esquema.bin',
+    filePath: '/vault/esquema.bin',
+    summary: 'Penetra CORE-7, evita el hash señuelo y sustrae el esquema del núcleo.',
+    stages: [
+      { id: 'read', label: 'Abrir el contrato', hint: 'Ejecuta "mail" y después "mail read 2" para revisar el encargo de CORE-7.' },
+      { id: 'scan', label: 'Escanear la red', hint: 'Ejecuta "netscan" para localizar CORE-7 (172.16.4.20).' },
+      { id: 'connect', label: 'Conectar con CORE-7', hint: 'Ejecuta "connect 172.16.4.20".' },
+      { id: 'hash', label: 'Encontrar la credencial real', hint: 'Conectado, ejecuta "ls /etc" y "cat /etc/shadow.hash". Ignora los señuelos de /home/analista.' },
+      { id: 'crack', label: 'Romper el hash del núcleo', hint: 'Ejecuta "crack <hash>" con el contenido de /etc/shadow.hash.' },
+      { id: 'download', label: 'Extraer esquema.bin', hint: 'Ejecuta "download /vault/esquema.bin".' },
+      { id: 'clean', label: 'Borrar las huellas', hint: 'Ejecuta "logs" para reducir el rastreo antes de salir.' }
+    ]
+  },
+  {
+    id: 'm3',
+    mailId: 3,
+    nextMailId: 4,
+    title: 'PROTOCOLO CERO',
+    codename: 'BLACKGATE',
+    ip: '10.0.0.66',
+    hash: 'e2c48b71a903f6d15b78ca0944de1f7b',
+    hash2: 'c9d0f4a2b681e7354fd9a0c26e8b13aa',
+    file: 'arkhive.dat',
+    filePath: '/vault/arkhive.dat',
+    summary: 'Cruza BLACKGATE hacia ARKHIVE, descifra el doble salto y extrae el archivo cero.',
+    stages: [
+      { id: 'read', label: 'Abrir el contrato', hint: 'Ejecuta "mail" y después "mail read 3" para aceptar el Protocolo Cero.' },
+      { id: 'scan', label: 'Escanear la red', hint: 'Ejecuta "netscan" para localizar BLACKGATE (10.0.0.66).' },
+      { id: 'connect', label: 'Conectar con BLACKGATE', hint: 'Ejecuta "connect 10.0.0.66".' },
+      { id: 'key', label: 'Obtener la llave de enlace', hint: 'Conectado a BLACKGATE, ejecuta "cat /root/gateway.key".' },
+      { id: 'crack', label: 'Descifrar la llave', hint: 'Ejecuta "crack <hash>" con el hash de gateway.key.' },
+      { id: 'route', label: 'Leer la ruta interna', hint: 'Ejecuta "cat /data/route.conf" para descubrir el nodo ARKHIVE.' },
+      { id: 'pivot', label: 'Saltar a ARKHIVE', hint: 'Ejecuta "connect 10.0.0.99" para pivotar al nodo secundario.' },
+      { id: 'hash2', label: 'Localizar la credencial cero', hint: 'En ARKHIVE, ejecuta "cat /vault/arkhive.hash".' },
+      { id: 'crack2', label: 'Romper la credencial cero', hint: 'Ejecuta "crack <hash>" con el hash de arkhive.hash.' },
+      { id: 'download', label: 'Extraer arkhive.dat', hint: 'Ejecuta "download /vault/arkhive.dat".' },
+      { id: 'clean', label: 'Borrar todas las huellas', hint: 'Ejecuta "logs" para cerrar el Protocolo Cero.' }
+    ]
+  }
+];
+
+/** @type {Record<string, NodeInfo>} */
+const NODE_INFO = {
+  '10.42.0.13': { name: 'HELIX', missionId: 'm1', ports: '22/tcp ssh · 443/tcp https', risk: 'MEDIO' },
+  '172.16.4.20': { name: 'CORE-7', missionId: 'm2', ports: '22/tcp ssh · 8443/tcp api', risk: 'ALTO' },
+  '10.0.0.66': { name: 'BLACKGATE', missionId: 'm3', ports: '2222/tcp ssh · 9000/tcp relay', risk: 'ALTO' },
+  '10.0.0.99': { name: 'ARKHIVE', missionId: 'm3', ports: '443/tcp https · 7000/tcp vault', risk: 'CRÍTICO' }
+};
+
+/** @type {Record<string, Record<string, string>>} */
+const DISCOVERY_STAGES = {
+  m1: { 'home/operator/access.hash': 'hash' },
+  m2: { 'etc/shadow.hash': 'hash' },
+  m3: { 'root/gateway.key': 'key', 'data/route.conf': 'route', 'vault/arkhive.hash': 'hash2' }
+};
+
+/** @type {MailMessage[]} */
+const MAILS = [
+  {
+    id: 1,
+    from: 'root@nbr.net',
+    subject: 'CONTRATO 001 // HELIX',
+    date: '03 NOV 2026 23:40',
+    missionId: 'm1',
+    body: [
+      'AGENTE GHOST:',
+      '',
+      'Tu primer contrato está activo. El nodo HELIX (10.42.0.13) almacena los registros de clientes de una corporación con demasiados secretos.',
+      '',
+      'SECUENCIA DEL ENCARGO:',
+      '1. Ejecuta "netscan" para localizar el nodo.',
+      '2. Conecta con "connect 10.42.0.13".',
+      '3. Explora "/home/operator" y lee "access.hash".',
+      '4. Rompe la credencial con "crack <hash>".',
+      '5. Extrae "/data/clientes.dat" con "download".',
+      '6. Borra los registros con "logs".',
+      '',
+      'Cada acción deja una firma. Si la traza llega al 100%, la red te bloqueará. Usa "trace" para consultar el riesgo y "pista" si necesitas asistencia.',
+      '',
+      '— NBR // CONTROL DE OPERACIONES'
+    ].join('\n')
+  },
+  {
+    id: 2,
+    from: 'root@nbr.net',
+    subject: 'CONTRATO 002 // CORE-7',
+    date: '04 NOV 2026 00:12',
+    missionId: 'm2',
+    body: [
+      'AGENTE GHOST:',
+      '',
+      'HELIX era solo la puerta. CORE-7 (172.16.4.20) custodia el esquema del núcleo y ha empezado a mover defensas.',
+      '',
+      'ADVERTENCIA: la máquina está sembrada con hashes señuelo. El archivo válido está en "/etc/shadow.hash"; los documentos de "/home/analista" son una trampa.',
+      '',
+      'SECUENCIA:',
+      '1. "netscan" y "connect 172.16.4.20".',
+      '2. "cat /etc/shadow.hash".',
+      '3. "crack <hash>".',
+      '4. "download /vault/esquema.bin".',
+      '5. "logs" para desaparecer.',
+      '',
+      'El margen de error se reduce. La presión defensiva crece con cada bloqueo.',
+      '',
+      '— NBR // CONTROL DE OPERACIONES'
+    ].join('\n')
+  },
+  {
+    id: 3,
+    from: 'root@nbr.net',
+    subject: 'CONTRATO 003 // PROTOCOLO CERO',
+    date: '04 NOV 2026 01:03',
+    missionId: 'm3',
+    body: [
+      'AGENTE GHOST:',
+      '',
+      'Último encargo. BLACKGATE (10.0.0.66) es la puerta. ARKHIVE (10.0.0.99) es el archivo cero. No hay vuelta atrás.',
+      '',
+      'La ruta está dentro de BLACKGATE. Deberás abrir la llave de enlace, descifrarla y leer "/data/route.conf" para encontrar el nodo secundario. Desde allí, salta a ARKHIVE y busca "/vault/arkhive.hash".',
+      '',
+      'SECUENCIA:',
+      '1. "netscan" y "connect 10.0.0.66".',
+      '2. "cat /root/gateway.key".',
+      '3. "crack <hash>".',
+      '4. "cat /data/route.conf".',
+      '5. "connect 10.0.0.99".',
+      '6. "cat /vault/arkhive.hash", "crack <hash>".',
+      '7. "download /vault/arkhive.dat".',
+      '8. "logs" para cerrar todas las huellas.',
+      '',
+      'El Protocolo Cero no admite errores. Confío en tu pulso.',
+      '',
+      '— NBR // CONTROL DE OPERACIONES'
+    ].join('\n')
+  },
+  {
+    id: 4,
+    from: 'nbr@root.net',
+    subject: 'PROTOCOLO CERO // COMPLETADO',
+    date: '04 NOV 2026 01:59',
+    missionId: 'none',
+    body: [
+      'AGENTE GHOST:',
+      '',
+      'ARKHIVE ha caído y el archivo cero está en tus manos. Has completado los tres contratos sin entregar tu identidad a la red.',
+      '',
+      'La firma NBR queda grabada en el núcleo. Puedes seguir explorando la terminal, revisar los nodos o iniciar una nueva incursión con mayor presión defensiva.',
+      '',
+      'El rastreo nunca desaparece del todo. Pero hoy, la red es tuya.',
+      '',
+      '— Nayara Bastida (NBR)'
+    ].join('\n')
+  }
+];
+
+/** @returns {GameState} */
+function createInitialState() {
+  /** @type {Record<string, MissionProgress>} */
+  const missions = {};
+  for (const mission of MISSIONS) {
+    missions[mission.id] = { stage: 0, completed: false, read: false };
+  }
+  return {
+    version: SAVE_VERSION,
+    theme: 'ubuntu',
+    difficulty: 'normal',
+    sound: true,
+    trace: 0,
+    heat: 0,
+    elapsedMs: 0,
+    lastSavedAt: 0,
+    booted: false,
+    cwd: ['home', 'ghost'],
+    remoteCwd: [],
+    connectedIp: null,
+    missions,
+    mail: { unlocked: 1, read: [] },
+    files: { downloads: [], logsCleared: 0, discovered: [] },
+    history: [],
+    stats: { commands: 0, errors: 0, locks: 0, missions: 0, cracked: 0 },
+    tutorialSeen: false,
+    victoryShown: false,
+    lockUntil: 0,
+    traceWarnLevel: 0
+  };
+}
+
+/** @type {GameState} */
+let state;
+let timerRunning = false;
+let timerAnchor = 0;
+let hadSave = false;
+let storageAvailable = true;
+let storageWarning = '';
+let booted = false;
+let pendingConfirmation = '';
+let fastForward = false;
+
+/** @param {number} value @param {number} min @param {number} max @returns {number} */
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+/** @param {number} ms @returns {Promise<void>} */
+function sleep(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+/** @param {number} ms @returns {string} */
+function formatClock(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const hours = String(Math.floor(total / 3600)).padStart(2, '0');
+  const minutes = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const seconds = String(total % 60).padStart(2, '0');
+  return `${hours}:${minutes}:${seconds}`;
+}
+
+/** @param {number} ms @returns {string} */
+function formatCountdown(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = String(Math.floor(total / 60)).padStart(2, '0');
+  const seconds = String(total % 60).padStart(2, '0');
+  return `${minutes}:${seconds}`;
+}
+
+/** @param {number} length @returns {string} */
+function randomHexString(length) {
+  const chars = '0123456789abcdef';
+  let output = '';
+  for (let index = 0; index < length; index += 1) {
+    output += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return output;
+}
+
+/** @param {unknown} value @returns {value is Record<string, unknown>} */
+function isRecord(value) {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** @param {unknown} value @param {number} min @param {number} max @param {number} fallback @returns {number} */
+function readNumber(value, min, max, fallback) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return clamp(value, min, max);
+}
+
+/** @param {unknown} value @returns {string[]} */
+function readStringArray(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((entry) => typeof entry === 'string');
+}
+
+/** @returns {number} */
+function getElapsedMs() {
+  return state.elapsedMs + (timerRunning ? Date.now() - timerAnchor : 0);
+}
+
+/** @returns {boolean} */
+function isLocked() {
+  return state.lockUntil > Date.now();
+}
+
+/** @param {Record<string, unknown>} data @param {GameState} base @returns {GameState} */
+function sanitizeState(data, base) {
+  const restored = createInitialState();
+  restored.theme = data.theme === 'cyberpunk' ? 'cyberpunk' : 'ubuntu';
+  restored.difficulty = data.difficulty === 'facil' || data.difficulty === 'normal' || data.difficulty === 'dificil'
+    ? data.difficulty
+    : base.difficulty;
+  restored.sound = typeof data.sound === 'boolean' ? data.sound : base.sound;
+  restored.trace = readNumber(data.trace, 0, 100, 0);
+  restored.heat = readNumber(data.heat, 0, 5, 0);
+  restored.elapsedMs = readNumber(data.elapsedMs, 0, Number.MAX_SAFE_INTEGER, 0);
+  restored.lastSavedAt = readNumber(data.lastSavedAt, 0, Number.MAX_SAFE_INTEGER, 0);
+  restored.booted = data.booted === true;
+  restored.cwd = readStringArray(data.cwd).length > 0 ? readStringArray(data.cwd) : ['home', 'ghost'];
+  restored.remoteCwd = readStringArray(data.remoteCwd);
+  restored.connectedIp = typeof data.connectedIp === 'string' && NODE_INFO[data.connectedIp]
+    ? data.connectedIp
+    : null;
+  restored.tutorialSeen = data.tutorialSeen === true;
+  restored.victoryShown = data.victoryShown === true;
+  restored.lockUntil = readNumber(data.lockUntil, 0, Number.MAX_SAFE_INTEGER, 0);
+  restored.traceWarnLevel = readNumber(data.traceWarnLevel, 0, 100, 0);
+  const history = readStringArray(data.history);
+  restored.history = history.slice(-HISTORY_LIMIT);
+  if (isRecord(data.stats)) {
+    restored.stats.commands = readNumber(data.stats.commands, 0, Number.MAX_SAFE_INTEGER, 0);
+    restored.stats.errors = readNumber(data.stats.errors, 0, Number.MAX_SAFE_INTEGER, 0);
+    restored.stats.locks = readNumber(data.stats.locks, 0, Number.MAX_SAFE_INTEGER, 0);
+    restored.stats.missions = readNumber(data.stats.missions, 0, MISSIONS.length, 0);
+    restored.stats.cracked = readNumber(data.stats.cracked, 0, Number.MAX_SAFE_INTEGER, 0);
+  }
+  if (isRecord(data.mail)) {
+    restored.mail.unlocked = readNumber(data.mail.unlocked, 1, MAILS.length, 1);
+    if (Array.isArray(data.mail.read)) {
+      const seen = new Set();
+      for (const entry of data.mail.read) {
+        if (typeof entry === 'number' && entry >= 1 && entry <= MAILS.length && !seen.has(entry)) {
+          seen.add(entry);
+          restored.mail.read.push(entry);
+        }
+      }
+    }
+  }
+  if (isRecord(data.missions)) {
+    for (const mission of MISSIONS) {
+      const source = data.missions[mission.id];
+      if (!isRecord(source)) {
+        continue;
+      }
+      const stage = readNumber(source.stage, 0, mission.stages.length, 0);
+      restored.missions[mission.id] = {
+        stage: Math.floor(stage),
+        completed: source.completed === true || stage >= mission.stages.length,
+        read: source.read === true
+      };
+    }
+  }
+  if (isRecord(data.files)) {
+    restored.files.logsCleared = readNumber(data.files.logsCleared, 0, Number.MAX_SAFE_INTEGER, 0);
+    restored.files.discovered = readStringArray(data.files.discovered);
+    if (Array.isArray(data.files.downloads)) {
+      /** @type {DownloadRecord[]} */
+      const downloads = [];
+      for (const entry of data.files.downloads) {
+        if (!isRecord(entry)) {
+          continue;
+        }
+        const name = typeof entry.name === 'string' ? entry.name : '';
+        const content = typeof entry.content === 'string' ? entry.content : '';
+        if (!name || !content) {
+          continue;
+        }
+        downloads.push({
+          missionId: typeof entry.missionId === 'string' ? entry.missionId : 'desconocida',
+          name,
+          path: typeof entry.path === 'string' ? entry.path : `/${name}`,
+          content,
+          at: typeof entry.at === 'string' ? entry.at : 'sesión anterior'
+        });
+      }
+      restored.files.downloads = downloads;
+    }
+  }
+  return restored;
+}
+
+/** @returns {GameState} */
+function loadState() {
+  const base = createInitialState();
+  let raw = null;
+  try {
+    raw = localStorage.getItem(SAVE_KEY);
+  } catch (error) {
+    storageAvailable = false;
+    storageWarning = 'No se pudo acceder al almacenamiento local. El progreso no se conservará al recargar.';
+    return base;
+  }
+  if (!raw) {
+    return base;
+  }
+  /** @type {unknown} */
+  let parsed = null;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    storageWarning = 'La partida guardada estaba corrupta y se ha descartado. Se inicia una sesión nueva.';
+    try {
+      localStorage.removeItem(SAVE_KEY);
+    } catch (removeError) {
+      storageAvailable = false;
+    }
+    return base;
+  }
+  if (!isRecord(parsed)) {
+    storageWarning = 'La partida guardada no tiene un formato válido y se ha descartado.';
+    return base;
+  }
+  hadSave = true;
+  return sanitizeState(parsed, base);
+}
+
+/** @returns {void} */
+function saveState() {
+  if (!booted) {
+    return;
+  }
+  const now = Date.now();
+  state.elapsedMs = getElapsedMs();
+  timerAnchor = now;
+  state.lastSavedAt = now;
+  state.version = SAVE_VERSION;
+  if (!storageAvailable) {
+    return;
+  }
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+  } catch (error) {
+    storageAvailable = false;
+    storageWarning = 'No se pudo guardar el progreso: almacenamiento local no disponible.';
+    if (booted) {
+      showToast(storageWarning, 'error');
+    }
+  }
+}
+
+/** @type {AudioContext|null} */
+let audioContext = null;
+/** @type {GainNode|null} */
+let masterGain = null;
+let lastKeySound = 0;
+
+/** @returns {void} */
+function ensureAudio() {
+  if (audioContext) {
+    if (audioContext.state === 'suspended') {
+      void audioContext.resume();
+    }
+    return;
+  }
+  try {
+    audioContext = new AudioContext();
+    masterGain = audioContext.createGain();
+    masterGain.gain.value = 0.55;
+    const compressor = audioContext.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.knee.value = 18;
+    compressor.ratio.value = 5;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.22;
+    masterGain.connect(compressor);
+    compressor.connect(audioContext.destination);
+    if (audioContext.state === 'suspended') {
+      void audioContext.resume();
+    }
+  } catch (error) {
+    audioContext = null;
+    masterGain = null;
+  }
+}
+
+/** @param {{freq:number,duration:number,type?:OscillatorType,gain?:number,delay?:number,slide?:number}} spec @returns {void} */
+function playTone(spec) {
+  if (!state || !state.sound || !audioContext || !masterGain) {
+    return;
+  }
+  if (audioContext.state === 'suspended') {
+    void audioContext.resume();
+  }
+  const start = audioContext.currentTime + (spec.delay ?? 0);
+  const duration = Math.max(0.02, spec.duration);
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  oscillator.type = spec.type ?? 'sine';
+  oscillator.frequency.setValueAtTime(Math.max(20, spec.freq), start);
+  if (spec.slide) {
+    oscillator.frequency.exponentialRampToValueAtTime(Math.max(20, spec.slide), start + duration);
+  }
+  const level = Math.max(0.0001, spec.gain ?? 0.05);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(level, start + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  oscillator.connect(gain);
+  gain.connect(masterGain);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.02);
+}
+
+/** @returns {void} */
+function playKeyClick() {
+  if (!state || !state.sound) {
+    return;
+  }
+  const now = Date.now();
+  if (now - lastKeySound < 24) {
+    return;
+  }
+  lastKeySound = now;
+  playTone({ freq: 620 + Math.random() * 520, duration: 0.025, type: 'square', gain: 0.012 });
+}
+
+/** @returns {void} */
+function playErrorBeep() {
+  playTone({ freq: 150, duration: 0.14, type: 'sawtooth', gain: 0.055, slide: 82 });
+  playTone({ freq: 98, duration: 0.2, type: 'square', gain: 0.04, delay: 0.08, slide: 62 });
+}
+
+/** @returns {void} */
+function playSuccess() {
+  const notes = [523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((freq, index) => {
+    playTone({ freq, duration: 0.11, type: 'triangle', gain: 0.05, delay: index * 0.065 });
+  });
+}
+
+/** @returns {void} */
+function playAlarm() {
+  playTone({ freq: 880, duration: 0.11, type: 'square', gain: 0.035 });
+  playTone({ freq: 660, duration: 0.11, type: 'square', gain: 0.03, delay: 0.14 });
+}
+
+/** @returns {void} */
+function playFanfare() {
+  const notes = [392, 523.25, 659.25, 783.99, 1046.5];
+  notes.forEach((freq, index) => {
+    playTone({ freq, duration: 0.2, type: 'triangle', gain: 0.045, delay: index * 0.12 });
+  });
+  playTone({ freq: 261.63, duration: 0.65, type: 'sine', gain: 0.035, delay: 0.55 });
+  playTone({ freq: 392, duration: 0.65, type: 'sine', gain: 0.03, delay: 0.55 });
+  playTone({ freq: 523.25, duration: 0.65, type: 'sine', gain: 0.025, delay: 0.55 });
+}
+
+/** @returns {void} */
+function playLockSiren() {
+  playTone({ freq: 196, duration: 0.36, type: 'sawtooth', gain: 0.05, slide: 98 });
+  playTone({ freq: 98, duration: 0.5, type: 'square', gain: 0.035, delay: 0.28, slide: 62 });
+}
+
+/** @param {string|(()=>string)} content @param {string} [mode] @param {boolean} [hidden] @returns {VfsFile} */
+function makeFile(content, mode = '644', hidden = false) {
+  return { type: 'file', content, mode, hidden };
+}
+
+/** @param {Record<string, VfsNode>} children @param {string} [mode] @returns {VfsDir} */
+function makeDir(children, mode = '755') {
+  return { type: 'dir', children, mode };
+}
+
+/** @param {string} id @returns {MissionDef} */
+function getMission(id) {
+  const mission = MISSIONS.find((entry) => entry.id === id);
+  if (!mission) {
+    throw new Error('Misión desconocida en el sistema.');
+  }
+  return mission;
+}
+
+/** @param {VfsFile} node @returns {string} */
+function readFileContent(node) {
+  return typeof node.content === 'function' ? node.content() : node.content;
+}
+
+/** @param {VfsNode} node @returns {number} */
+function nodeSize(node) {
+  if (node.type === 'dir') {
+    return 4096;
+  }
+  return new TextEncoder().encode(readFileContent(node)).length;
+}
+
+/** @param {VfsNode} node @returns {string} */
+function nodeDate(node) {
+  if (node.type === 'dir') {
+    return '2026-11-03';
+  }
+  return '2026-11-03';
+}
+
+/** @returns {VfsDir} */
+function createLocalVfs() {
+  /** @type {Record<string, VfsNode>} */
+  const downloads = {};
+  for (const download of state.files.downloads) {
+    downloads[download.name] = makeFile(download.content);
+  }
+  const missionLines = MISSIONS.map((mission) => {
+    const progress = state.missions[mission.id];
+    const status = progress.completed ? 'COMPLETADA' : progress.stage > 0 ? `ETAPA ${progress.stage}/${mission.stages.length}` : 'PENDIENTE';
+    return `${mission.id.toUpperCase()} · ${mission.title} · ${status}`;
+  }).join('\n');
+  return makeDir({
+    'README.txt': makeFile([
+      'NEON//BREACH — Terminal de intrusión',
+      'Desarrollado por Nayara Bastida (NBR)',
+      '',
+      'Comandos recomendados:',
+      '  tutorial   Manual interactivo.',
+      '  help       Lista de comandos y ayuda detallada.',
+      '  mail       Bandeja de entrada de contratos.',
+      '  status     Estado de la sesión.',
+      '',
+      'Todo el progreso se guarda automáticamente en este navegador.',
+      'No hay conexiones reales: la red es una simulación narrativa.'
+    ].join('\n')),
+    home: makeDir({
+      ghost: makeDir({
+        '.bashrc': makeFile('# NBR shell\nPS1="ghost@nbr:\\w$ "\nalias ll="ls -la"\nexport TRACE_WATCH=1\n', '644', true),
+        'manifiesto.txt': makeFile([
+          'No hay sistemas inexpugnables.',
+          'Solo operadores con prisa.',
+          '',
+          'La red recuerda cada comando. La única forma de desaparecer',
+          'es limpiar las huellas antes de que la traza llegue a 100%.',
+          '',
+          '— NBR'
+        ].join('\n')),
+        'notas_operador.txt': makeFile(`ESTADO DE CONTRATOS\n\n${missionLines}\n\nTraza actual: ${Math.round(state.trace)}%\nPresión defensiva: nivel ${state.heat}\n\nUsa "pista" si necesitas la siguiente acción exacta.`),
+        docs: makeDir({
+          'glosario.txt': makeFile([
+            'TRACE: probabilidad acumulada de que la red identifique tu sesión.',
+            'HASH: huella criptográfica usada como credencial.',
+            'NODO: servidor remoto expuesto en la simulación.',
+            'LOGS: registros de acceso que delatan tu presencia.',
+            'PIVOTE: salto desde un nodo comprometido hacia otro.',
+            'NBR: firma de la autora del sistema.'
+          ].join('\n')),
+          'nbr.asc': makeFile([
+            '-----BEGIN NBR SIGNATURE-----',
+            'Autoría: Nayara Bastida',
+            'Alias: NBR',
+            'Proyecto: NEON//BREACH',
+            'Tecnología: HTML5 · CSS3 · JavaScript Vanilla · Web Audio API',
+            'Dependencias externas: ninguna',
+            '-----END NBR SIGNATURE-----'
+          ].join('\n'))
+        }),
+        descargas: makeDir(downloads)
+      })
+    }),
+    etc: makeDir({
+      'hosts': makeFile([
+        '127.0.0.1 localhost nbr',
+        '10.42.0.13 helix.local',
+        '172.16.4.20 core-7.local',
+        '10.0.0.66 blackgate.local',
+        '10.0.0.99 arkhive.local',
+        '# Las entradas remotas solo son visibles tras el escaneo.'
+      ].join('\n')),
+      'motd': makeFile('Bienvenido a NBR-NET. Toda intrusión deja una firma.'),
+      'resolv.conf': makeFile('nameserver 10.0.0.1\nnameserver 10.0.0.2\nsearch nbr.net')
+    }),
+    var: makeDir({
+      log: makeDir({
+        'auth.log': makeFile(() => state.files.logsCleared > 0
+          ? 'Registro rotado por el operador. No hay entradas recientes.'
+          : [
+            'Nov 03 23:41:02 nbr sshd[1042]: accepted publickey for ghost',
+            'Nov 03 23:41:03 nbr sudo[1051]: ghost : TTY=pts/0 ; COMMAND=/bin/bash',
+            'Nov 03 23:41:09 nbr kernel: trace watch armed',
+            `Nov 03 23:42:00 nbr trace[1100]: current level ${Math.round(state.trace)}%`
+          ].join('\n')),
+        'trace.log': makeFile(() => [
+          `nivel_actual=${Math.round(state.trace)}`,
+          `presion_defensiva=${state.heat}`,
+          `dificultad=${DIFFICULTIES[state.difficulty].label}`,
+          `conexion=${state.connectedIp ?? 'NINGUNA'}`,
+          `bloqueo=${isLocked() ? 'ACTIVO' : 'INACTIVO'}`
+        ].join('\n'))
+      })
+    }),
+    opt: makeDir({
+      tools: makeDir({
+        'netscan.conf': makeFile('mode=passive\nthreads=8\nshow_ghosts=true\nresolve_alias=true'),
+        'crack.cfg': makeFile('engine=gpu-sim\nwordlist=rockyou.sim\ntimeout=30\nstop_on_success=true'),
+        'protocolo_nbr.txt': makeFile([
+          'PROTOCOLO NBR // REGLAS DE OPERACIÓN',
+          '',
+          '1. Lee el contrato antes de tocar la red.',
+          '2. Escanea antes de conectar.',
+          '3. No descargues datos sin descifrar la credencial.',
+          '4. Limpia los logs después de extraer.',
+          '5. Si la traza llega al 100%, la red controla la sesión.',
+          '6. Nunca confíes en un hash que aparece en un directorio señuelo.'
+        ].join('\n'))
+      })
+    }),
+    tmp: makeDir({
+      '.keep': makeFile('', '600', true)
+    })
+  });
+}
+
+/** @param {string} ip @returns {VfsDir} */
+function createRemoteVfs(ip) {
+  const m1 = getMission('m1');
+  const m2 = getMission('m2');
+  const m3 = getMission('m3');
+  if (ip === '10.42.0.13') {
+    return makeDir({
+      home: makeDir({
+        operator: makeDir({
+          'access.hash': makeFile([
+            '# HELIX // credencial de operador',
+            'usuario: operator',
+            `hash: ${m1.hash}`,
+            'algoritmo: sim-sha256',
+            'nota: la descarga de /data requiere esta credencial'
+          ].join('\n')),
+          'notas.txt': makeFile('Ronda nocturna a las 03:00. El relay de CORE-7 envía el esquema.'),
+          'perfil.conf': makeFile('shell=/bin/rbash\nlast_login=2026-11-03T23:17:44\nzone=helix-core')
+        })
+      }),
+      data: makeDir({
+        'clientes.dat': makeFile([
+          'HELIX CLIENT REGISTRY // SIMULACIÓN',
+          'cliente_001|Aurora Systems|contrato_7741|activo',
+          'cliente_002|Kite Logistics|contrato_8890|suspendido',
+          'cliente_003|NBR Anonymous|contrato_0000|clasificado',
+          'cliente_004|Vanta Labs|contrato_9122|activo',
+          'cliente_005|Ghost Division|contrato_1312|negado',
+          'checksum: 7c4e91aa'
+        ].join('\n'))
+      }),
+      var: makeDir({
+        log: makeDir({
+          'secure.log': makeFile('Nov 03 23:17:44 sshd: session opened for operator\nNov 03 23:29:10 relay: sync started\nNov 03 23:40:22 trace: anomaly detected')
+        })
+      })
+    });
+  }
+  if (ip === '172.16.4.20') {
+    return makeDir({
+      etc: makeDir({
+        'shadow.hash': makeFile([
+          '# CORE-7 // credencial del núcleo',
+          'servicio: vault-controller',
+          `hash: ${m2.hash}`,
+          'estado: protegido'
+        ].join('\n')),
+        'hostname': makeFile('core-7'),
+        'services.conf': makeFile('vault:8443\nssh:22\nwatchdog:on')
+      }),
+      home: makeDir({
+        analista: makeDir({
+          'notas.txt': makeFile([
+            '# CORE-7 // notas del analista',
+            'hash de prueba: 0000deadbeef0000deadbeef0000dead',
+            'Este hash es un señuelo. La credencial real vive en /etc/shadow.hash.',
+            'Si intentas crackearlo, el watchdog recibirá una alerta.'
+          ].join('\n')),
+          'ledger.csv': makeFile('registro,activo\nA-77,si\nB-19,no\nC-04,si')
+        })
+      }),
+      vault: makeDir({
+        'esquema.bin': makeFile([
+          'CORE-7 SCHEMA // SIMULACIÓN',
+          'nodo_raiz=core-7',
+          'canal=blackgate-relay',
+          'firma_nbr=0x9f4a7c21',
+          'payload=[segmento_alfa][segmento_omega]',
+          'checksum=b881e0fa'
+        ].join('\n'))
+      }),
+      var: makeDir({
+        log: makeDir({
+          'audit.log': makeFile('23:44:01 watchdog: passive scan detected\n23:44:08 vault: access denied\n23:44:12 trace: counter incremented')
+        })
+      })
+    });
+  }
+  if (ip === '10.0.0.66') {
+    return makeDir({
+      root: makeDir({
+        'gateway.key': makeFile([
+          '# BLACKGATE // llave de enlace',
+          `hash: ${m3.hash}`,
+          'uso: abrir tabla de rutas interna',
+          'duracion: efímera'
+        ].join('\n'))
+      }),
+      data: makeDir({
+        'route.conf': makeFile([
+          '[upstream]',
+          'nodo_secundario=10.0.0.99',
+          'alias=ARKHIVE',
+          'servicio=arkhive-vault',
+          'nota=requiere credencial local',
+          '[fallback]',
+          'nodo=10.0.0.66'
+        ].join('\n'))
+      }),
+      home: makeDir({
+        relay: makeDir({
+          'LEEME.txt': makeFile('El relay no guarda secretos. La ruta está en /data/route.conf.')
+        })
+      }),
+      var: makeDir({
+        log: makeDir({
+          'edge.log': makeFile('edge relay online\nroute table sealed\narkhive link latency 42ms')
+        })
+      })
+    });
+  }
+  return makeDir({
+    vault: makeDir({
+      'arkhive.hash': makeFile([
+        '# ARKHIVE // credencial cero',
+        'usuario: arkhive',
+        `hash: ${m3.hash2 ?? ''}`,
+        'nivel: cero',
+        'nota: única llave para arkhive.dat'
+      ].join('\n')),
+      'arkhive.dat': makeFile([
+        'ARKHIVE // ARCHIVO CERO · SIMULACIÓN',
+        'registro_000: origen=blackgate',
+        'registro_001: destino=arkhive',
+        'registro_002: operador=ghost',
+        'registro_003: firma=NBR',
+        'registro_004: estado=protocolo_cero',
+        'payload=[no_hay_vuelta_atras]',
+        'checksum=ce0d4a77'
+      ].join('\n'))
+    }),
+    var: makeDir({
+      log: makeDir({
+        'core.log': makeFile('core vault online\nseal level cero\nall routes point to nbr')
+      })
+    }),
+    README: makeFile('ARKHIVE. Si estás leyendo esto, el contrato ya está en marcha.')
+  });
+}
+
+/** @param {string} input @param {string[]} base @param {boolean} remote @returns {string[]} */
+function resolvePath(input, base, remote) {
+  let clean = input.trim();
+  if (!clean) {
+    return base.slice();
+  }
+  let parts = clean.startsWith('/') ? [] : base.slice();
+  if (clean === '~' || clean.startsWith('~/')) {
+    parts = remote ? [] : ['home', 'ghost'];
+    clean = clean.slice(1);
+  }
+  const segments = clean.split('/');
+  for (const segment of segments) {
+    if (!segment || segment === '.') {
+      continue;
+    }
+    if (segment === '..') {
+      if (parts.length > 0) {
+        parts.pop();
+      }
+      continue;
+    }
+    parts.push(segment);
+  }
+  return parts;
+}
+
+/** @param {VfsNode} root @param {string[]} parts @returns {VfsNode|undefined} */
+function getVfsNode(root, parts) {
+  /** @type {VfsNode} */
+  let current = root;
+  for (const part of parts) {
+    if (current.type !== 'dir') {
+      return undefined;
+    }
+    const next = current.children[part];
+    if (!next) {
+      return undefined;
+    }
+    current = next;
+  }
+  return current;
+}
+
+/** @returns {boolean} */
+function isRemoteSession() {
+  return state.connectedIp !== null && state.connectedIp !== '';
+}
+
+/** @returns {VfsDir} */
+function getCurrentVfs() {
+  return isRemoteSession() && state.connectedIp ? createRemoteVfs(state.connectedIp) : createLocalVfs();
+}
+
+/** @returns {string[]} */
+function getCurrentCwd() {
+  return isRemoteSession() ? state.remoteCwd : state.cwd;
+}
+
+/** @param {string[]} parts @returns {void} */
+function setCurrentCwd(parts) {
+  if (isRemoteSession()) {
+    state.remoteCwd = parts.slice();
+  } else {
+    state.cwd = parts.slice();
+  }
+}
+
+/** @param {string[]} parts @param {boolean} remote @returns {string} */
+function pathLabel(parts, remote) {
+  if (remote) {
+    return parts.length === 0 ? '/' : `/${parts.join('/')}`;
+  }
+  if (parts.length >= 2 && parts[0] === 'home' && parts[1] === 'ghost') {
+    const tail = parts.slice(2).join('/');
+    return tail ? `~/${tail}` : '~';
+  }
+  return parts.length === 0 ? '/' : `/${parts.join('/')}`;
+}
+
+/** @param {string[]} parts @returns {string} */
+function pathKey(parts) {
+  return parts.join('/');
+}
+
+const appEl = document.getElementById('app');
+const terminalEl = document.getElementById('terminal');
+const outputEl = document.getElementById('output');
+const inputEl = document.getElementById('command-input');
+const inputForm = document.getElementById('input-form');
+const promptLabel = document.getElementById('prompt-label');
+const traceBar = document.getElementById('trace-bar');
+const traceValue = document.getElementById('trace-value');
+const themeLabel = document.getElementById('theme-label');
+const difficultyLabel = document.getElementById('difficulty-label');
+const missionLabel = document.getElementById('mission-label');
+const timerLabel = document.getElementById('timer-label');
+const soundLabel = document.getElementById('sound-label');
+const connStatus = document.getElementById('conn-status');
+const statusHint = document.getElementById('status-hint');
+const themeChip = document.getElementById('theme-chip');
+const soundChip = document.getElementById('sound-chip');
+const bootOverlay = document.getElementById('boot-overlay');
+const bootButton = document.getElementById('boot-button');
+const bootStatus = document.getElementById('boot-status');
+const bootAscii = document.getElementById('boot-ascii');
+const tutorialOverlay = document.getElementById('tutorial-overlay');
+const tutorialContent = document.getElementById('tutorial-content');
+const tutorialDots = document.getElementById('tutorial-dots');
+const tutorialPrev = document.getElementById('tutorial-prev');
+const tutorialNext = document.getElementById('tutorial-next');
+const tutorialClose = document.getElementById('tutorial-close');
+const victoryOverlay = document.getElementById('victory-overlay');
+const victoryStats = document.getElementById('victory-stats');
+const victoryClose = document.getElementById('victory-close');
+const lockOverlay = document.getElementById('lock-overlay');
+const lockCountdown = document.getElementById('lock-countdown');
+const lockProgress = document.getElementById('lock-progress');
+const lockNote = document.getElementById('lock-note');
+const toastContainer = document.getElementById('toast-container');
+const matrixCanvas = document.getElementById('matrix-canvas');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** @returns {number} */
+function missionProgress() {
+  let total = 0;
+  let done = 0;
+  for (const mission of MISSIONS) {
+    total += mission.stages.length;
+    done += Math.min(state.missions[mission.id].stage, mission.stages.length);
+  }
+  return total === 0 ? 0 : Math.round((done / total) * 100);
+}
+
+/** @returns {number} */
+function completedMissions() {
+  return MISSIONS.filter((mission) => state.missions[mission.id].completed).length;
+}
+
+/** @returns {MissionDef|null} */
+function getActiveMission() {
+  for (const mission of MISSIONS) {
+    const progress = state.missions[mission.id];
+    if (!progress.completed && progress.stage > 0) {
+      return mission;
+    }
+  }
+  return null;
+}
+
+/** @returns {MissionDef|null} */
+function getNextMission() {
+  for (const mission of MISSIONS) {
+    if (!state.missions[mission.id].completed) {
+      return mission;
+    }
+  }
+  return null;
+}
+
+/** @returns {number} */
+function unreadMailCount() {
+  let count = 0;
+  for (const message of MAILS) {
+    if (message.id <= state.mail.unlocked && !state.mail.read.includes(message.id)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+/** @returns {void} */
+function updatePrompt() {
+  if (pendingConfirmation) {
+    promptLabel.textContent = 'CONFIRMAR@NBR>';
+    return;
+  }
+  if (isRemoteSession() && state.connectedIp) {
+    promptLabel.textContent = `ghost@${state.connectedIp}:${pathLabel(state.remoteCwd, true)}#`;
+    return;
+  }
+  promptLabel.textContent = `ghost@nbr:${pathLabel(state.cwd, false)}$`;
+}
+
+/** @returns {void} */
+function updateStatusHint() {
+  if (!booted) {
+    statusHint.textContent = 'ESPERANDO INICIO DE SESIÓN';
+    return;
+  }
+  if (pendingConfirmation) {
+    statusHint.textContent = 'CONFIRMA EL REINICIO CON S O N';
+    return;
+  }
+  if (isLocked()) {
+    statusHint.textContent = 'SISTEMA BLOQUEADO // CONTENCIÓN ACTIVA';
+    return;
+  }
+  const active = getActiveMission();
+  if (active) {
+    const progress = state.missions[active.id];
+    statusHint.textContent = `MISIÓN ${MISSIONS.indexOf(active) + 1}/${MISSIONS.length} · ${active.title} · ETAPA ${Math.min(progress.stage + 1, active.stages.length)}/${active.stages.length}`;
+    return;
+  }
+  if (unreadMailCount() > 0) {
+    statusHint.textContent = 'CORREO SIN LEER · EJECUTA mail';
+    return;
+  }
+  if (completedMissions() === MISSIONS.length) {
+    statusHint.textContent = 'TODOS LOS CONTRATOS COMPLETADOS · mail read 4 o reset';
+    return;
+  }
+  statusHint.textContent = 'TAB autocompleta · ↑↓ historial · help para comandos';
+}
+
+/** @returns {void} */
+function updateHUD() {
+  if (!state) {
+    return;
+  }
+  const roundedTrace = Math.round(state.trace);
+  traceBar.style.width = `${roundedTrace}%`;
+  traceValue.textContent = `${roundedTrace}%`;
+  themeLabel.textContent = THEMES[state.theme].label;
+  difficultyLabel.textContent = `${DIFFICULTIES[state.difficulty].label}${state.heat > 0 ? ` +${state.heat}` : ''}`;
+  missionLabel.textContent = `${missionProgress()}%`;
+  timerLabel.textContent = formatClock(getElapsedMs());
+  soundLabel.textContent = state.sound ? 'ON' : 'MUTE';
+  soundChip.setAttribute('aria-pressed', String(state.sound));
+  document.body.classList.toggle('trace-warning', state.trace >= 75 && !isLocked());
+  document.body.classList.toggle('trace-critical', state.trace >= 92 || isLocked());
+  if (isRemoteSession() && state.connectedIp) {
+    const info = NODE_INFO[state.connectedIp];
+    connStatus.textContent = `REMOTO ${state.connectedIp} // ${info ? info.name : 'NODO'}`;
+    connStatus.classList.add('remote');
+  } else {
+    connStatus.textContent = 'LOCAL // SIN CONEXIÓN';
+    connStatus.classList.remove('remote');
+  }
+  updatePrompt();
+  updateStatusHint();
+}
+
+/** @param {ThemeName} theme @returns {void} */
+function applyTheme(theme) {
+  state.theme = theme;
+  document.body.dataset.theme = theme;
+  updateHUD();
+}
+
+/** @param {string} text @param {'info'|'warn'|'error'|'success'} [type] @returns {void} */
+function showToast(text, type = 'info') {
+  if (!toastContainer) {
+    return;
+  }
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = text;
+  toastContainer.appendChild(toast);
+  while (toastContainer.children.length > 4) {
+    toastContainer.firstElementChild?.remove();
+  }
+  window.setTimeout(() => {
+    toast.remove();
+  }, 4200);
+}
+
+/** @returns {void} */
+function glitch() {
+  if (reducedMotion) {
+    return;
+  }
+  appEl.classList.remove('glitching');
+  terminalEl.classList.remove('glitching');
+  void appEl.offsetWidth;
+  appEl.classList.add('glitching');
+  terminalEl.classList.add('glitching');
+  window.setTimeout(() => {
+    appEl.classList.remove('glitching');
+    terminalEl.classList.remove('glitching');
+  }, 760);
+}
+
+/** @type {{text:string, cls:string, typewriter:boolean, delay:number}[]} */
+let renderQueue = [];
+let outputBusy = false;
+let outputToken = 0;
+
+/** @param {string} text @param {string} [cls] @param {boolean} [typewriter] @param {number} [delay] @returns {void} */
+function print(text, cls = '', typewriter = true, delay = 6) {
+  const lines = String(text).split('\n');
+  for (const line of lines) {
+    renderQueue.push({ text: line, cls, typewriter, delay });
+  }
+  void pumpOutput();
+}
+
+/** @param {string} text @returns {void} */
+function printAscii(text) {
+  renderQueue.push({ text, cls: 'line-ascii', typewriter: false, delay: 0 });
+  void pumpOutput();
+}
+
+/** @param {string} text @param {string} [cls] @returns {void} */
+function printBlock(text, cls = '') {
+  print(text, cls, false);
+}
+
+/** @returns {void} */
+function flushOutput() {
+  if (renderQueue.length > 0 || outputBusy) {
+    fastForward = true;
+  }
+}
+
+/** @returns {void} */
+function clearOutput() {
+  outputToken += 1;
+  renderQueue = [];
+  outputBusy = false;
+  fastForward = false;
+  outputEl.replaceChildren();
+}
+
+/** @param {HTMLElement} element @param {string} text @param {number} token @param {number} delay @returns {Promise<void>} */
+async function animateLine(element, text, token, delay) {
+  if (fastForward || reducedMotion || text.length > 220) {
+    element.textContent = text;
+    await sleep(fastForward ? 0 : delay);
+    return;
+  }
+  const step = text.length > 95 ? 3 : text.length > 45 ? 2 : 1;
+  for (let index = 0; index < text.length; index += step) {
+    if (token !== outputToken || fastForward) {
+      element.textContent = text;
+      await sleep(0);
+      return;
+    }
+    element.textContent = text.slice(0, index + step);
+    if (index % 4 === 0) {
+      await sleep(2);
+    }
+  }
+  element.textContent = text;
+  await sleep(delay);
+}
+
+/** @returns {Promise<void>} */
+async function pumpOutput() {
+  if (outputBusy) {
+    return;
+  }
+  const token = outputToken;
+  outputBusy = true;
+  while (renderQueue.length > 0 && token === outputToken) {
+    const item = renderQueue.shift();
+    if (!item) {
+      break;
+    }
+    const line = document.createElement('div');
+    line.className = `line ${item.cls}`.trim();
+    outputEl.appendChild(line);
+    if (item.typewriter) {
+      await animateLine(line, item.text, token, item.delay);
+    } else {
+      line.textContent = item.text;
+      if (!fastForward) {
+        await sleep(item.delay);
+      }
+    }
+    outputEl.scrollTop = outputEl.scrollHeight;
+  }
+  if (token === outputToken) {
+    outputBusy = false;
+    fastForward = false;
+    if (renderQueue.length > 0) {
+      void pumpOutput();
+    }
+  }
+}
+
+/** @param {string} id @returns {MailMessage|undefined} */
+function getMail(id) {
+  return MAILS.find((message) => message.id === id);
+}
+
+/** @param {missionId:string} missionId @param {string} stageId @returns {boolean} */
+function tryAdvance(missionId, stageId) {
+  const mission = getMission(missionId);
+  const progress = state.missions[missionId];
+  if (!progress || progress.completed) {
+    return false;
+  }
+  const expected = mission.stages[progress.stage];
+  if (!expected || expected.id !== stageId) {
+    return false;
+  }
+  progress.stage += 1;
+  progress.read = true;
+  print(`[OK] Objetivo completado: ${expected.label} (${progress.stage}/${mission.stages.length})`, 'line-success');
+  playSuccess();
+  updateHUD();
+  if (progress.stage >= mission.stages.length) {
+    completeMission(mission);
+  } else {
+    saveState();
+  }
+  return true;
+}
+
+/** @param {MissionDef} mission @returns {void} */
+function completeMission(mission) {
+  const progress = state.missions[mission.id];
+  if (progress.completed) {
+    return;
+  }
+  progress.completed = true;
+  progress.stage = mission.stages.length;
+  state.stats.missions += 1;
+  state.mail.unlocked = Math.max(state.mail.unlocked, mission.nextMailId);
+  print('', 'line-dim');
+  print('══════════════════════════════════════════════════════════', 'line-success');
+  print(`MISIÓN COMPLETADA // ${mission.title}`, 'line-success');
+  print(`Nodo ${mission.codename} comprometido. La firma NBR queda registrada.`, 'line-info');
+  print('══════════════════════════════════════════════════════════', 'line-success');
+  print('', 'line-dim');
+  const nextMail = getMail(mission.nextMailId);
+  if (nextMail) {
+    print(`[CORREO] Nuevo mensaje disponible: #${nextMail.id} — ${nextMail.subject}`, 'line-mail');
+    print('Ejecuta "mail" para revisar la bandeja.', 'line-info');
+    showToast(`Nuevo correo #${nextMail.id}: ${nextMail.subject}`, 'success');
+  }
+  playFanfare();
+  updateHUD();
+  saveState();
+  if (mission.id === 'm3') {
+    window.setTimeout(() => {
+      if (booted && !isLocked()) {
+        showVictoryOverlay();
+      }
+    }, 1700);
+  }
+}
+
+/** @param {number} value @returns {number} */
+function traceBand(value) {
+  if (value >= 90) {
+    return 90;
+  }
+  if (value >= 75) {
+    return 75;
+  }
+  if (value >= 50) {
+    return 50;
+  }
+  if (value >= 25) {
+    return 25;
+  }
+  return 0;
+}
+
+/** @param {number} amount @param {string} [reason] @returns {void} */
+function addTrace(amount, reason = 'actividad sospechosa') {
+  if (isLocked()) {
+    return;
+  }
+  const previousBand = state.traceWarnLevel;
+  state.trace = clamp(state.trace + amount, 0, 100);
+  const currentBand = traceBand(state.trace);
+  state.traceWarnLevel = currentBand;
+  if (amount > 0 && currentBand > previousBand) {
+    if (currentBand === 50) {
+      print('[!] La red ha detectado actividad anómala. Traza al 50%.', 'line-warn');
+    }
+    if (currentBand === 75) {
+      print('[!!] RASTREO CRÍTICO // 75% — Los defensores están en el nodo.', 'line-error');
+      print('Usa "logs" para reducir la traza antes de continuar.', 'line-warn');
+      glitch();
+      playAlarm();
+    }
+    if (currentBand === 90) {
+      print('[!!!] TRAZA AL 90% // Bloqueo inminente. Limpia las huellas ahora.', 'line-error');
+      glitch();
+      playAlarm();
+    }
+  }
+  if (amount > 0 && state.trace >= 100) {
+    print('', 'line-dim');
+    print('[!!!] TRAZA AL 100% // La red ha cerrado el cerco.', 'line-error');
+    beginLockdown(reason);
+  }
+  updateHUD();
+}
+
+/** @param {string} [reason] @returns {void} */
+function beginLockdown(reason = 'violación de seguridad') {
+  if (isLocked() || !booted) {
+    return;
+  }
+  const config = DIFFICULTIES[state.difficulty];
+  state.trace = 100;
+  state.traceWarnLevel = 100;
+  state.lockUntil = Date.now() + config.lock * 1000;
+  state.stats.locks += 1;
+  inputEl.disabled = true;
+  tutorialOpen = false;
+  tutorialOverlay.classList.add('hidden');
+  victoryOverlay.classList.add('hidden');
+  lockOverlay.classList.remove('hidden');
+  updateLockUi();
+  updateHUD();
+  saveState();
+  glitch();
+  playErrorBeep();
+  window.setTimeout(() => {
+    if (isLocked()) {
+      playLockSiren();
+    }
+  }, 260);
+  print('', 'line-dim');
+  print('BLOQUEO DE SEGURIDAD ACTIVADO', 'line-error');
+  print(`Motivo: ${reason}. La terminal permanecerá aislada ${config.lock} segundos.`, 'line-warn');
+  window.setTimeout(() => {
+    inputEl.blur();
+  }, 10);
+}
+
+/** @returns {void} */
+function updateLockUi() {
+  const remaining = Math.max(0, state.lockUntil - Date.now());
+  const total = DIFFICULTIES[state.difficulty].lock * 1000;
+  lockCountdown.textContent = formatCountdown(remaining);
+  lockProgress.style.width = `${clamp((remaining / total) * 100, 0, 100)}%`;
+  lockNote.textContent = `Contención ${DIFFICULTIES[state.difficulty].label} · presión defensiva actual nivel ${state.heat}`;
+}
+
+/** @returns {void} */
+function completeLockdown() {
+  if (state.lockUntil === 0) {
+    return;
+  }
+  state.lockUntil = 0;
+  state.heat = Math.min(5, state.heat + 1);
+  state.trace = Math.min(55, 18 + state.heat * 6);
+  state.traceWarnLevel = traceBand(state.trace);
+  lockOverlay.classList.add('hidden');
+  if (booted) {
+    inputEl.disabled = false;
+  }
+  document.body.classList.remove('trace-critical');
+  print('', 'line-dim');
+  print('══════════════════════════════════════════════════════════', 'line-warn');
+  print('BLOQUEO LEVANTADO // La red ha terminado el barrido.', 'line-warn');
+  print(`Nueva presión defensiva: nivel ${state.heat}. El rastreo pasivo se acelera.`, 'line-info');
+  print('La sesión se ha restablecido. El progreso de las misiones se conserva.', 'line-info');
+  print('══════════════════════════════════════════════════════════', 'line-warn');
+  playSuccess();
+  updateHUD();
+  saveState();
+  if (booted) {
+    inputEl.focus();
+  }
+}
+
+/** @returns {void} */
+function passiveTraceTick() {
+  if (!booted || !timerRunning || isLocked() || !isRemoteSession()) {
+    return;
+  }
+  const config = DIFFICULTIES[state.difficulty];
+  const rate = config.rate * (1 + state.heat * 0.35);
+  addTrace(rate, 'conexión remota mantenida');
+}
+
+/** @param {VfsNode} node @returns {string} */
+function permissionString(node) {
+  const mode = node.mode ?? (node.type === 'dir' ? '755' : '644');
+  const bits = mode.split('');
+  const symbols = ['---', '--x', '-w-', '-wx', 'r--', 'r-x', 'rw-', 'rwx'];
+  const owner = symbols[Number(bits[0] ?? 7)] ?? '---';
+  const group = symbols[Number(bits[1] ?? 5)] ?? '---';
+  const other = symbols[Number(bits[2] ?? 5)] ?? '---';
+  return `${node.type === 'dir' ? 'd' : '-'}${owner}${group}${other}`;
+}
+
+/** @param {VfsDir} dir @param {boolean} showAll @param {boolean} longFormat @returns {string[]} */
+function listDirectory(dir, showAll, longFormat) {
+  const entries = Object.entries(dir.children)
+    .filter(([, node]) => showAll || !node.hidden)
+    .sort((left, right) => {
+      const leftNode = left[1];
+      const rightNode = right[1];
+      if (leftNode.type !== rightNode.type) {
+        return leftNode.type === 'dir' ? -1 : 1;
+      }
+      return left[0].localeCompare(right[0], 'es');
+    });
+  if (entries.length === 0) {
+    return ['[directorio vacío]'];
+  }
+  return entries.map(([name, node]) => {
+    const suffix = node.type === 'dir' ? '/' : '';
+    if (longFormat) {
+      const size = nodeSize(node).toString().padStart(7, ' ');
+      return `${permissionString(node)} ${size} ${nodeDate(node)} ${name}${suffix}`;
+    }
+    return `  ${name}${suffix}`;
+  });
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdLs(args) {
+  let showAll = false;
+  let longFormat = false;
+  const pathArgs = [];
+  for (const argument of args) {
+    if (argument.startsWith('-') && argument !== '-') {
+      for (const flag of argument.slice(1)) {
+        if (flag === 'a') {
+          showAll = true;
+        } else if (flag === 'l') {
+          longFormat = true;
+        } else {
+          print(`[ERROR] Opción no reconocida: -${flag}.`, 'line-error');
+          print('Uso: ls [-a] [-l] [directorio]', 'line-info');
+          playErrorBeep();
+          return;
+        }
+      }
+    } else {
+      pathArgs.push(argument);
+    }
+  }
+  const remote = isRemoteSession();
+  const target = pathArgs.length > 0 ? pathArgs.join(' ') : '.';
+  const parts = resolvePath(target, getCurrentCwd(), remote);
+  const root = getCurrentVfs();
+  const node = getVfsNode(root, parts);
+  if (!node) {
+    print(`[ERROR] No existe la ruta: ${target}`, 'line-error');
+    print('Comprueba el directorio actual con "pwd".', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  if (node.type === 'file') {
+    print(`[ARCHIVO] ${pathLabel(parts, remote)}`, 'line-info');
+    print(`${permissionString(node)} ${nodeSize(node).toString().padStart(7, ' ')} ${nodeDate(node)}`, 'line-dim');
+    return;
+  }
+  const listing = listDirectory(node, showAll, longFormat);
+  print(`// ${pathLabel(parts, remote)}`, 'line-accent');
+  for (const entry of listing) {
+    print(entry, entry.endsWith('/') ? 'line-info' : 'line-dim');
+  }
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdCd(args) {
+  const remote = isRemoteSession();
+  if (args.length === 0) {
+    setCurrentCwd(remote ? [] : ['home', 'ghost']);
+    updateHUD();
+    saveState();
+    return;
+  }
+  if (args.length > 1) {
+    print('[ERROR] Demasiados argumentos para cd.', 'line-error');
+    print('Uso: cd <directorio>', 'line-info');
+    return;
+  }
+  const target = args[0] ?? '';
+  const parts = resolvePath(target, getCurrentCwd(), remote);
+  const root = getCurrentVfs();
+  const node = getVfsNode(root, parts);
+  if (!node) {
+    print(`[ERROR] El directorio no existe: ${target}`, 'line-error');
+    playErrorBeep();
+    return;
+  }
+  if (node.type !== 'dir') {
+    print(`[ERROR] ${target} no es un directorio.`, 'line-error');
+    playErrorBeep();
+    return;
+  }
+  setCurrentCwd(parts);
+  updateHUD();
+  saveState();
+}
+
+/** @returns {void} */
+function cmdPwd() {
+  const remote = isRemoteSession();
+  if (remote && state.connectedIp) {
+    print(`remote://${state.connectedIp}${pathLabel(state.remoteCwd, true)}`, 'line-path');
+    return;
+  }
+  print(`/${state.cwd.join('/')}` || '/', 'line-path');
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdCat(args) {
+  if (args.length === 0) {
+    print('[ERROR] Falta el archivo que quieres leer.', 'line-error');
+    print('Uso: cat <archivo>', 'line-info');
+    return;
+  }
+  const remote = isRemoteSession();
+  const target = args.join(' ');
+  const parts = resolvePath(target, getCurrentCwd(), remote);
+  const root = getCurrentVfs();
+  const node = getVfsNode(root, parts);
+  if (!node) {
+    print(`[ERROR] No existe el archivo: ${target}`, 'line-error');
+    print('Usa "ls" para inspeccionar el directorio actual.', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  if (node.type === 'dir') {
+    print(`[ERROR] ${target} es un directorio, no un archivo.`, 'line-error');
+    print('Prueba con "ls" para listar su contenido.', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  const content = readFileContent(node);
+  print(`// ${pathLabel(parts, remote)}`, 'line-accent');
+  if (!content) {
+    print('[archivo vacío]', 'line-dim');
+  } else {
+    printBlock(content, 'line-info');
+  }
+  if (remote && state.connectedIp) {
+    const missionId = NODE_INFO[state.connectedIp]?.missionId;
+    if (missionId) {
+      const stageId = DISCOVERY_STAGES[missionId]?.[pathKey(parts)];
+      if (stageId) {
+        tryAdvance(missionId, stageId);
+        if (missionId === 'm3' && pathKey(parts) === 'data/route.conf') {
+          if (!state.files.discovered.includes('10.0.0.99')) {
+            state.files.discovered.push('10.0.0.99');
+          }
+          print('[ruta] Nodo secundario detectado: 10.0.0.99 // ARKHIVE', 'line-accent');
+        }
+      }
+      if (missionId === 'm2' && pathKey(parts) === 'home/analista/notas.txt') {
+        print('[!] Este documento parece un señuelo. La credencial real está en /etc/shadow.hash.', 'line-warn');
+      }
+    }
+  }
+  updateHUD();
+  saveState();
+}
+
+/** @returns {void} */
+function cmdClear() {
+  clearOutput();
+}
+
+/** @returns {void} */
+function cmdStatus() {
+  const active = getActiveMission();
+  const next = getNextMission();
+  const remote = isRemoteSession();
+  const targetMission = active ?? next;
+  print('ESTADO DE LA SESIÓN // NEON_BREACH', 'line-title');
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+  print(`Operador: ghost // Firma: NBR`, 'line-info');
+  print(`Directorio: ${remote && state.connectedIp ? `remote://${state.connectedIp}${pathLabel(state.remoteCwd, true)}` : `/${state.cwd.join('/')}`}`, 'line-info');
+  print(`Conexión: ${remote && state.connectedIp ? `REMOTA con ${state.connectedIp} (${NODE_INFO[state.connectedIp]?.name ?? 'NODO'})` : 'LOCAL, sin túnel activo'}`, 'line-info');
+  print(`Tema: ${THEMES[state.theme].label} // Dificultad: ${DIFFICULTIES[state.difficulty].label} // Presión: nivel ${state.heat}`, 'line-info');
+  print(`Traza: ${Math.round(state.trace)}% // Tiempo: ${formatClock(getElapsedMs())}`, state.trace >= 75 ? 'line-warn' : 'line-info');
+  print(`Misiones completadas: ${completedMissions()}/${MISSIONS.length} // Progreso global: ${missionProgress()}%`, 'line-info');
+  if (targetMission) {
+    const progress = state.missions[targetMission.id];
+    const label = active ? 'Misión actual' : 'Próximo contrato';
+    print(`${label}: ${targetMission.title} [${targetMission.codename}] — etapa ${Math.min(progress.stage + 1, targetMission.stages.length)}/${targetMission.stages.length}`, 'line-accent');
+  } else {
+    print('Misión actual: ninguna. Todos los contratos están completos.', 'line-success');
+  }
+  print(`Correos sin leer: ${unreadMailCount()} // Descargas: ${state.files.downloads.length} // Locks sufridos: ${state.stats.locks}`, 'line-info');
+  print(`Comandos ejecutados: ${state.stats.commands} // Errores: ${state.stats.errors} // Hashes rotos: ${state.stats.cracked}`, 'line-dim');
+  print(`Persistencia: ${storageAvailable ? 'activa en localStorage' : 'no disponible en este navegador'}`, storageAvailable ? 'line-dim' : 'line-error');
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+}
+
+/** @param {string} command @param {string} detail @returns {void} */
+function printUsageError(command, detail) {
+  print(`[ERROR] ${detail}`, 'line-error');
+  print(`Uso: ${command}`, 'line-info');
+  playErrorBeep();
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdTheme(args) {
+  if (args.length === 0) {
+    print(`Tema activo: ${THEMES[state.theme].label}`, 'line-info');
+    print('Uso: theme <ubuntu|cyberpunk>', 'line-info');
+    return;
+  }
+  if (args.length > 1) {
+    printUsageError('theme <ubuntu|cyberpunk>', 'Se esperaba un único nombre de tema.');
+    return;
+  }
+  const requested = (args[0] ?? '').toLowerCase();
+  if (requested !== 'ubuntu' && requested !== 'cyberpunk') {
+    print(`[ERROR] Tema desconocido: ${requested}`, 'line-error');
+    print('Temas disponibles: ubuntu, cyberpunk.', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  applyTheme(requested);
+  print(`[OK] Tema visual cambiado a ${THEMES[requested].label}.`, 'line-success');
+  playSuccess();
+  saveState();
+}
+
+/** @returns {void} */
+function cmdCredits() {
+  print('╔══════════════════════════════════════════════════════════╗', 'line-accent');
+  print('║               NEON//BREACH // TERMINAL NBR               ║', 'line-accent');
+  print('╚══════════════════════════════════════════════════════════╝', 'line-accent');
+  print('', 'line-dim');
+  print('Autoría: Nayara Bastida (NBR)', 'line-title');
+  print('Proyecto: simulador narrativo de intrusión ciberpunk', 'line-info');
+  print('Versión: 1.0', 'line-info');
+  print('Tecnologías: HTML5 · CSS3 · JavaScript Vanilla · Web Audio API', 'line-info');
+  print('Dependencias externas: ninguna', 'line-info');
+  print('Persistencia: localStorage del navegador', 'line-info');
+  print('Ejecución: directa mediante file:// o cualquier servidor estático', 'line-info');
+  print('', 'line-dim');
+  print('"La red recuerda cada comando. La firma también."', 'line-accent');
+  print('— NBR', 'line-accent');
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdMail(args) {
+  if (args.length === 0) {
+    printMailbox();
+    return;
+  }
+  const subcommand = (args[0] ?? '').toLowerCase();
+  if (subcommand !== 'read') {
+    printUsageError('mail | mail read <id>', 'Subcomando de correo no reconocido.');
+    return;
+  }
+  if (args.length !== 2) {
+    printUsageError('mail read <id>', 'Debes indicar el identificador numérico del correo.');
+    return;
+  }
+  const id = Number(args[1]);
+  if (!Number.isInteger(id) || id < 1) {
+    print('[ERROR] El identificador del correo debe ser un número entero positivo.', 'line-error');
+    playErrorBeep();
+    return;
+  }
+  const message = getMail(id);
+  if (!message) {
+    print(`[ERROR] No existe ningún correo con el identificador ${id}.`, 'line-error');
+    playErrorBeep();
+    return;
+  }
+  if (id > state.mail.unlocked) {
+    print(`[ERROR] El correo #${id} aún está bloqueado.`, 'line-error');
+    print('Completa el contrato actual para desbloquear el siguiente encargo.', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  const wasRead = state.mail.read.includes(id);
+  if (!wasRead) {
+    state.mail.read.push(id);
+  }
+  print('┌──────────────────────────────────────────────────────────┐', 'line-mail');
+  print(`│ CORREO #${id} · ${message.subject.padEnd(42, ' ').slice(0, 42)} │`, 'line-mail');
+  print('└──────────────────────────────────────────────────────────┘', 'line-mail');
+  print(`De: ${message.from}`, 'line-info');
+  print(`Fecha: ${message.date}`, 'line-info');
+  print('──────────────────────────────────────────────────────────', 'line-dim');
+  printBlock(message.body, 'line-info');
+  print('──────────────────────────────────────────────────────────', 'line-dim');
+  if (wasRead) {
+    print('[i] Este correo ya estaba marcado como leído.', 'line-dim');
+  } else {
+    print('[OK] Correo marcado como leído.', 'line-success');
+  }
+  if (message.missionId !== 'none') {
+    const mission = getMission(message.missionId);
+    const progress = state.missions[mission.id];
+    progress.read = true;
+    tryAdvance(mission.id, 'read');
+  }
+  if (id === 4) {
+    window.setTimeout(() => {
+      if (booted && !isLocked()) {
+        showVictoryOverlay();
+      }
+    }, 900);
+  }
+  updateHUD();
+  saveState();
+}
+
+/** @returns {void} */
+function printMailbox() {
+  print('BANDEJA DE ENTRADA // NBR-NET', 'line-title');
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+  let visibleCount = 0;
+  for (const message of MAILS) {
+    if (message.id > state.mail.unlocked) {
+      continue;
+    }
+    visibleCount += 1;
+    const isRead = state.mail.read.includes(message.id);
+    const marker = isRead ? '[LEÍDO]' : '[NUEVO]';
+    print(`${marker} #${message.id} · ${message.subject}`, isRead ? 'line-info' : 'line-mail');
+    print(`         De: ${message.from} // ${message.date}`, 'line-dim');
+  }
+  if (visibleCount === 0) {
+    print('[Bandeja vacía] No hay contratos disponibles.', 'line-warn');
+  }
+  const locked = MAILS.length - state.mail.unlocked;
+  if (locked > 0) {
+    print(`[${locked} correo(s) cifrado(s) pendiente(s) de desbloqueo]`, 'line-dim');
+  }
+  print('──────────────────────────────────────────────────────────', 'line-dim');
+  print('Usa "mail read <id>" para abrir un mensaje.', 'line-info');
+  print('Usa "pista" para recibir asistencia contextual.', 'line-info');
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdPista(args) {
+  if (args.length > 0) {
+    print('[i] "pista" no necesita argumentos. Se adapta a tu etapa actual.', 'line-info');
+  }
+  if (completedMissions() === MISSIONS.length) {
+    print('[PISTA] Has completado todos los contratos. Ejecuta "reset" para empezar de nuevo o usa "mail" para releer los mensajes.', 'line-success');
+    return;
+  }
+  const active = getActiveMission();
+  if (!active) {
+    const next = getNextMission();
+    if (!next) {
+      print('[PISTA] No quedan contratos por ejecutar.', 'line-success');
+      return;
+    }
+    const progress = state.missions[next.id];
+    if (!progress.read) {
+      print(`[PISTA] Hay un contrato pendiente. Ejecuta "mail" y luego "mail read ${next.mailId}".`, 'line-warn');
+      return;
+    }
+    print(`[PISTA] Tu siguiente objetivo es "${next.stages[progress.stage]?.label ?? next.title}".`, 'line-warn');
+    return;
+  }
+  const progress = state.missions[active.id];
+  const stage = active.stages[progress.stage];
+  if (!stage) {
+    print('[PISTA] La misión actual está cerrada. Revisa tu correo.', 'line-info');
+    return;
+  }
+  print(`[PISTA] ${active.title} · objetivo ${Math.min(progress.stage + 1, active.stages.length)}/${active.stages.length}: ${stage.label}`, 'line-accent');
+  print(stage.hint, 'line-info');
+  if (state.trace >= 60) {
+    print(`[PISTA] La traza está al ${Math.round(state.trace)}%. Si supera el 75%, ejecuta "logs" o aléjate del nodo.`, 'line-warn');
+  }
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdHelp(args) {
+  if (args.length > 0) {
+    const requested = (args[0] ?? '').toLowerCase();
+    const spec = findCommand(requested);
+    if (!spec) {
+      print(`[ERROR] No existe ayuda para el comando "${requested}".`, 'line-error');
+      print('Ejecuta "help" para ver la lista completa de comandos.', 'line-info');
+      playErrorBeep();
+      return;
+    }
+    print(`NOMBRE`, 'line-title');
+    print(`  ${spec.name} — ${spec.summary}`, 'line-info');
+    print('', 'line-dim');
+    print(`SINOPSIS`, 'line-title');
+    print(`  ${spec.usage}`, 'line-accent');
+    print('', 'line-dim');
+    print(`DESCRIPCIÓN`, 'line-title');
+    printBlock(spec.description, 'line-info');
+    print('', 'line-dim');
+    print(`PARÁMETROS / OPCIONES`, 'line-title');
+    if (spec.parameters.length === 0) {
+      print('  Ninguno.', 'line-dim');
+    } else {
+      for (const parameter of spec.parameters) {
+        print(`  ${parameter}`, 'line-info');
+      }
+    }
+    print('', 'line-dim');
+    print(`EJEMPLOS`, 'line-title');
+    for (const example of spec.examples) {
+      print(`  ${example}`, 'line-accent');
+    }
+    if (spec.aliases.length > 0) {
+      print('', 'line-dim');
+      print(`ALIAS`, 'line-title');
+      print(`  ${spec.aliases.join(', ')}`, 'line-info');
+    }
+    if (spec.seeAlso.length > 0) {
+      print('', 'line-dim');
+      print(`VER TAMBIÉN`, 'line-title');
+      print(`  ${spec.seeAlso.join(', ')}`, 'line-info');
+    }
+    return;
+  }
+  print('AYUDA DE LA TERMINAL // COMANDOS DISPONIBLES', 'line-title');
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+  print('COMANDO        DESCRIPCIÓN', 'line-title');
+  const categories = ['Navegación', 'Sistema', 'Misiones', 'Hacking', 'Control'];
+  const specs = Object.values(COMMANDS);
+  for (const category of categories) {
+    const categorySpecs = specs
+      .filter((spec) => spec.category === category)
+      .sort((left, right) => left.name.localeCompare(right.name, 'es'));
+    if (categorySpecs.length === 0) {
+      continue;
+    }
+    print('', 'line-dim');
+    print(`// ${category.toUpperCase()}`, 'line-accent');
+    for (const spec of categorySpecs) {
+      print(`${spec.name.padEnd(14, ' ')} ${spec.summary}`, 'line-info');
+    }
+  }
+  print('', 'line-dim');
+  print('Usa "help <comando>" para ver sintaxis, parámetros y ejemplos.', 'line-accent');
+  print('Usa "tutorial" para abrir el manual interactivo completo.', 'line-info');
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdTutorial(args) {
+  if (args.length > 0) {
+    print('[i] El tutorial no acepta argumentos. Abriendo manual interactivo...', 'line-info');
+  } else {
+    print('[i] Abriendo manual interactivo de NEON//BREACH...', 'line-info');
+  }
+  openTutorial();
+}
+
+/** @param {string} ip @returns {{ok:boolean, reason:string}} */
+function canReachNode(ip) {
+  const info = NODE_INFO[ip];
+  if (!info) {
+    return { ok: false, reason: 'La dirección IP no pertenece a ningún nodo conocido.' };
+  }
+  const mission = getMission(info.missionId);
+  const progress = state.missions[mission.id];
+  if (progress.completed) {
+    return { ok: true, reason: '' };
+  }
+  if (info.missionId === 'm3' && ip === '10.0.0.99') {
+    if (progress.stage >= 6) {
+      return { ok: true, reason: '' };
+    }
+    return { ok: false, reason: 'ARKHIVE no está expuesto en esta ruta. Lee /data/route.conf antes de pivotar.' };
+  }
+  const connectStage = mission.stages.findIndex((stage) => stage.id === 'connect');
+  if (progress.stage < connectStage) {
+    return { ok: false, reason: 'El nodo no está autorizado en tu ruta actual. Abre el contrato y ejecuta "netscan".' };
+  }
+  return { ok: true, reason: '' };
+}
+
+/** @returns {void} */
+function cmdNetscan() {
+  const active = getActiveMission();
+  const targetMission = active ?? getNextMission();
+  print('NETSCAN // SONDEO DE RED NBR-NET', 'line-title');
+  print('Escaneando rutas, puertos y huellas pasivas...', 'line-dim');
+  print(`[scan] handshake ${randomHexString(8)} // ttl 64 // fingerprint sim`, 'line-dim');
+  print(`[scan] barrido de subred completado en ${(0.4 + Math.random() * 1.8).toFixed(2)}s`, 'line-dim');
+  print('──────────────────────────────────────────────────────────', 'line-dim');
+  let discoveredAny = false;
+  if (targetMission) {
+    const progress = state.missions[targetMission.id];
+    if (progress.read || progress.stage > 0) {
+      const info = NODE_INFO[targetMission.ip];
+      if (info) {
+        print(`NODO ABIERTO · ${info.name}`, 'line-success');
+        print(`  ip=${targetMission.ip}  puertos=${info.ports}  riesgo=${info.risk}`, 'line-info');
+        print('  estado=VULNERABLE // contrato activo', 'line-dim');
+        if (!state.files.discovered.includes(targetMission.ip)) {
+          state.files.discovered.push(targetMission.ip);
+        }
+        discoveredAny = true;
+      }
+      if (targetMission.id === 'm3' && progress.stage >= 6) {
+        print('NODO SECUNDARIO · ARKHIVE', 'line-accent');
+        print('  ip=10.0.0.99  puertos=443/tcp https · 7000/tcp vault  riesgo=CRÍTICO', 'line-info');
+        print('  estado=ENLAZADO POR BLACKGATE // ruta descubierta', 'line-dim');
+        if (!state.files.discovered.includes('10.0.0.99')) {
+          state.files.discovered.push('10.0.0.99');
+        }
+        discoveredAny = true;
+      }
+    }
+  }
+  if (!discoveredAny) {
+    print('NODO LOCAL · nbr-net', 'line-info');
+    print('  ip=127.0.0.1  puertos=22/tcp ssh  riesgo=BAJO', 'line-dim');
+    print('  estado=ESTABLE // no hay contratos autorizados', 'line-dim');
+    print('[!] Abre "mail" y lee tu contrato antes de lanzar un ataque.', 'line-warn');
+  }
+  print('──────────────────────────────────────────────────────────', 'line-dim');
+  print('Escaneo finalizado. La actividad pasiva ha dejado una pequeña firma.', 'line-info', false);
+  addTrace(1, 'escaneo de red');
+  if (active) {
+    const progress = state.missions[active.id];
+    if (progress.stage === 1) {
+      tryAdvance(active.id, 'scan');
+    }
+  }
+  updateHUD();
+  saveState();
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdConnect(args) {
+  if (args.length === 0) {
+    printUsageError('connect <ip>', 'Falta la dirección IP del nodo objetivo.');
+    return;
+  }
+  if (args.length > 1) {
+    printUsageError('connect <ip>', 'Se esperaba una única dirección IP.');
+    return;
+  }
+  const ip = args[0] ?? '';
+  if (isRemoteSession() && state.connectedIp === ip) {
+    print(`[i] Ya tienes una conexión activa con ${ip}.`, 'line-info');
+    return;
+  }
+  const access = canReachNode(ip);
+  if (!access.ok) {
+    print(`[ERROR] No se puede conectar con ${ip}.`, 'line-error');
+    print(access.reason, 'line-warn');
+    if (!NODE_INFO[ip]) {
+      print('Usa "netscan" para descubrir nodos autorizados.', 'line-info');
+    }
+    addTrace(DIFFICULTIES[state.difficulty].error, 'intento de conexión fallido');
+    glitch();
+    playErrorBeep();
+    updateHUD();
+    saveState();
+    return;
+  }
+  const info = NODE_INFO[ip];
+  if (!info) {
+    print('[ERROR] Nodo sin información disponible.', 'line-error');
+    return;
+  }
+  if (isRemoteSession() && state.connectedIp) {
+    print(`[tunnel] Cerrando enlace anterior con ${state.connectedIp}.`, 'line-dim');
+  }
+  state.connectedIp = ip;
+  state.remoteCwd = [];
+  print('', 'line-dim');
+  print('╔══════════════════════════════════════════════════════════╗', 'line-success');
+  print(`║ ACCESO CONCEDIDO // ${info.name.padEnd(36, ' ').slice(0, 36)} ║`, 'line-success');
+  print('╚══════════════════════════════════════════════════════════╝', 'line-success');
+  print(`Enlace establecido con ${ip}. Puertos: ${info.ports}.`, 'line-info');
+  print(`Directorio remoto inicial: /  // Riesgo del nodo: ${info.risk}`, 'line-info');
+  print('La traza pasiva comienza a subir mientras mantengas la conexión.', 'line-warn');
+  if (!state.files.discovered.includes(ip)) {
+    state.files.discovered.push(ip);
+  }
+  playSuccess();
+  addTrace(2, 'conexión remota establecida');
+  const mission = getMission(info.missionId);
+  const stageId = info.missionId === 'm3' && ip === '10.0.0.99' ? 'pivot' : 'connect';
+  tryAdvance(mission.id, stageId);
+  updateHUD();
+  saveState();
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdCrack(args) {
+  if (args.length === 0) {
+    printUsageError('crack <hash|ip>', 'Falta el hash o la IP objetivo.');
+    return;
+  }
+  if (args.length > 1) {
+    printUsageError('crack <hash|ip>', 'La credencial debe ser un único valor sin espacios.');
+    return;
+  }
+  if (!isRemoteSession() || !state.connectedIp) {
+    print('[ERROR] No hay conexión remota activa.', 'line-error');
+    print('Conecta con un nodo antes de lanzar la fuerza bruta.', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  const ip = state.connectedIp;
+  const info = NODE_INFO[ip];
+  if (!info) {
+    print('[ERROR] La conexión actual no tiene un nodo asociado.', 'line-error');
+    return;
+  }
+  const mission = getMission(info.missionId);
+  const progress = state.missions[mission.id];
+  const expected = mission.stages[progress.stage];
+  const value = (args[0] ?? '').trim().toLowerCase();
+  let expectedHash = '';
+  if (expected?.id === 'crack') {
+    expectedHash = mission.hash;
+  } else if (expected?.id === 'crack2') {
+    expectedHash = mission.hash2 ?? '';
+  }
+  print(`CRACK // objetivo ${info.name} (${ip})`, 'line-title');
+  print(`[engine] cargando diccionario simulado ${randomHexString(6)}...`, 'line-dim');
+  print(`[engine] probando ${(1200000 + Math.random() * 8000000).toFixed(0)} combinaciones...`, 'line-dim');
+  if (expectedHash && (value === expectedHash.toLowerCase() || value === ip)) {
+    print('[engine] colisión encontrada. Validando credencial...', 'line-warn');
+    print('', 'line-dim');
+    print('╔══════════════════════════════════════════════════════════╗', 'line-success');
+    print('║ CREDENCIAL DESCIFRADA // ACCESO AL OBJETIVO CONCEDIDO    ║', 'line-success');
+    print('╚══════════════════════════════════════════════════════════╝', 'line-success');
+    print(`Hash aceptado: ${expectedHash}`, 'line-hash');
+    state.stats.cracked += 1;
+    playSuccess();
+    addTrace(1.2, 'credencial descifrada');
+    tryAdvance(mission.id, expected.id);
+    updateHUD();
+    saveState();
+    return;
+  }
+  if (value === mission.hash.toLowerCase() || (mission.hash2 && value === mission.hash2.toLowerCase())) {
+    print('[!] La credencial es válida, pero no corresponde a esta fase de la intrusión.', 'line-warn');
+    print('Sigue la secuencia del contrato antes de reutilizarla.', 'line-info');
+    playErrorBeep();
+    addTrace(1.5, 'credencial fuera de secuencia');
+    updateHUD();
+    saveState();
+    return;
+  }
+  print('[engine] sin colisión. La credencial no abre este nodo.', 'line-error');
+  print('[!] Fuerza bruta fallida. El watchdog ha registrado el intento.', 'line-error');
+  glitch();
+  playErrorBeep();
+  addTrace(DIFFICULTIES[state.difficulty].error * 2.2, 'fuerza bruta fallida');
+  updateHUD();
+  saveState();
+}
+
+/** @param {VfsDir} dir @param {string} name @param {string[]} prefix @returns {{parts:string[],node:VfsFile}[]} */
+function findFilesByName(dir, name, prefix) {
+  /** @type {{parts:string[],node:VfsFile}[]} */
+  const results = [];
+  for (const [entryName, node] of Object.entries(dir.children)) {
+    if (node.type === 'dir') {
+      results.push(...findFilesByName(node, name, [...prefix, entryName]));
+    } else if (entryName === name) {
+      results.push({ parts: [...prefix, entryName], node });
+    }
+  }
+  return results;
+}
+
+/** @param {string} raw @returns {{parts:string[],node:VfsFile}|null} */
+function resolveRemoteFile(raw) {
+  if (!state.connectedIp) {
+    return null;
+  }
+  const root = createRemoteVfs(state.connectedIp);
+  const directParts = resolvePath(raw, state.remoteCwd, true);
+  const directNode = getVfsNode(root, directParts);
+  if (directNode && directNode.type === 'file') {
+    return { parts: directParts, node: directNode };
+  }
+  const baseName = raw.split('/').filter(Boolean).pop();
+  if (!baseName) {
+    return null;
+  }
+  const matches = findFilesByName(root, baseName, []);
+  if (matches.length === 1) {
+    const match = matches[0];
+    return match ?? null;
+  }
+  return null;
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdDownload(args) {
+  if (args.length === 0) {
+    printUsageError('download <archivo>', 'Falta el archivo remoto que quieres extraer.');
+    return;
+  }
+  if (!isRemoteSession() || !state.connectedIp) {
+    print('[ERROR] No hay conexión remota activa.', 'line-error');
+    print('Conecta con un nodo antes de descargar datos.', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  const ip = state.connectedIp;
+  const info = NODE_INFO[ip];
+  if (!info) {
+    print('[ERROR] La conexión no tiene información de nodo.', 'line-error');
+    return;
+  }
+  const mission = getMission(info.missionId);
+  const progress = state.missions[mission.id];
+  const raw = args.join(' ');
+  const found = resolveRemoteFile(raw);
+  if (!found) {
+    print(`[ERROR] No se encontró el archivo remoto: ${raw}`, 'line-error');
+    print('Usa "ls" y "cat" para inspeccionar la estructura remota.', 'line-info');
+    playErrorBeep();
+    addTrace(2, 'descarga fallida');
+    updateHUD();
+    saveState();
+    return;
+  }
+  const fileName = found.parts[found.parts.length - 1] ?? 'archivo';
+  const sourcePath = `/${found.parts.join('/')}`;
+  const isTarget = fileName === mission.file;
+  const downloadStage = mission.stages.findIndex((stage) => stage.id === 'download');
+  if (isTarget && !progress.completed && progress.stage < downloadStage) {
+    print(`[ERROR] ${fileName} está sellado por la credencial del nodo.`, 'line-error');
+    print('Descifra el hash correcto antes de intentar extraerlo.', 'line-warn');
+    playErrorBeep();
+    addTrace(DIFFICULTIES[state.difficulty].error, 'intento de descarga sellada');
+    updateHUD();
+    saveState();
+    return;
+  }
+  const content = readFileContent(found.node);
+  print(`[extract] abriendo canal con ${ip}:${sourcePath}`, 'line-dim');
+  print(`[extract] ${fileName} · ${nodeSize(found.node)} bytes`, 'line-info');
+  const record = {
+    missionId: mission.id,
+    name: fileName,
+    path: sourcePath,
+    content,
+    at: new Date().toISOString().slice(0, 16).replace('T', ' ')
+  };
+  const existingIndex = state.files.downloads.findIndex((download) => download.name === fileName);
+  if (existingIndex >= 0) {
+    state.files.downloads[existingIndex] = record;
+    print(`[i] El archivo local ${fileName} se ha sobrescrito.`, 'line-warn');
+  } else {
+    state.files.downloads.push(record);
+  }
+  print(`[OK] ${fileName} guardado en ~/descargas/${fileName}`, 'line-success');
+  print('Puedes leerlo en local con "cat ~/descargas/' + fileName + '".', 'line-info');
+  playSuccess();
+  addTrace(5, 'extracción de datos');
+  if (isTarget && progress.stage === downloadStage) {
+    tryAdvance(mission.id, 'download');
+  }
+  updateHUD();
+  saveState();
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdLogs(args) {
+  if (args.length > 0) {
+    print('[i] "logs" no acepta argumentos. Purgando registros de la sesión.', 'line-info');
+  }
+  print('PURGA DE REGISTROS // LIMPIEZA DE HUELLAS', 'line-title');
+  print('[wipe] rotando /var/log/auth.log...', 'line-dim');
+  print('[wipe] eliminando entradas de handshake y sesión...', 'line-dim');
+  print('[wipe] sobrescribiendo bloques con ruido criptográfico...', 'line-dim');
+  state.files.logsCleared += 1;
+  const before = Math.round(state.trace);
+  addTrace(-24);
+  print(`[OK] Registros purgados. Traza: ${before}% → ${Math.round(state.trace)}%`, 'line-success');
+  print('Las huellas locales y remotas han sido reducidas, pero no eliminadas por completo.', 'line-info');
+  playSuccess();
+  let missionId = state.connectedIp ? NODE_INFO[state.connectedIp]?.missionId : undefined;
+  if (!missionId) {
+    const active = getActiveMission();
+    if (active) {
+      missionId = active.id;
+    }
+  }
+  if (missionId) {
+    const mission = getMission(missionId);
+    const progress = state.missions[missionId];
+    const expected = mission.stages[progress.stage];
+    if (expected?.id === 'clean') {
+      tryAdvance(missionId, 'clean');
+    }
+  }
+  updateHUD();
+  saveState();
+}
+
+/** @returns {void} */
+function cmdTrace() {
+  const config = DIFFICULTIES[state.difficulty];
+  const band = traceBand(state.trace);
+  const levelName = state.trace >= 100
+    ? 'BLOQUEO TOTAL'
+    : band >= 90
+      ? 'CRÍTICO'
+      : band >= 75
+        ? 'ALTO'
+        : band >= 50
+          ? 'MODERADO'
+          : band >= 25
+            ? 'BAJO'
+            : 'MÍNIMO';
+  const filled = Math.round(state.trace / 5);
+  const bar = `${'#'.repeat(filled)}${'-'.repeat(20 - filled)}`;
+  const passive = config.rate * (1 + state.heat * 0.35);
+  print('MONITOR DE RASTREO // TRACE', 'line-title');
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+  print(`Nivel actual: ${Math.round(state.trace)}% [${bar}] ${levelName}`, state.trace >= 75 ? 'line-error' : 'line-info');
+  print(`Dificultad base: ${config.label} // Presión defensiva (heat): ${state.heat}`, 'line-info');
+  print(`Rastreo pasivo: +${passive.toFixed(2)}% cada 2 segundos mientras haya conexión.`, 'line-info');
+  print(`Tiempo de bloqueo al 100%: ${config.lock} segundos.`, 'line-info');
+  print(`Conexión actual: ${state.connectedIp ?? 'NINGUNA (local)'}`, 'line-info');
+  print(`Estado: ${isLocked() ? `BLOQUEADO · ${formatCountdown(state.lockUntil - Date.now())} restantes` : 'SESIÓN ABIERTA'}`, isLocked() ? 'line-error' : 'line-success');
+  print('Acciones defensivas: "logs" reduce la traza; "disconnect" detiene el rastreo pasivo.', 'line-dim');
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdDisconnect(args) {
+  if (args.length > 0) {
+    print('[i] "disconnect" no acepta argumentos.', 'line-info');
+  }
+  if (!isRemoteSession() || !state.connectedIp) {
+    print('[i] No hay ninguna conexión remota activa.', 'line-info');
+    return;
+  }
+  const ip = state.connectedIp;
+  const name = NODE_INFO[ip]?.name ?? 'NODO';
+  state.connectedIp = null;
+  state.remoteCwd = [];
+  print(`[tunnel] Enlace con ${name} (${ip}) cerrado.`, 'line-warn');
+  print('Has vuelto a la sesión local. El rastreo pasivo se detiene.', 'line-info');
+  playTone({ freq: 300, duration: 0.14, type: 'triangle', gain: 0.035, slide: 120 });
+  updateHUD();
+  saveState();
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdSound(args) {
+  if (args.length > 1) {
+    printUsageError('sound [on|off]', 'Demasiados argumentos.');
+    return;
+  }
+  const command = (args[0] ?? '').toLowerCase();
+  if (command && command !== 'on' && command !== 'off') {
+    print(`[ERROR] Opción de sonido desconocida: ${command}`, 'line-error');
+    print('Uso: sound [on|off]', 'line-info');
+    playErrorBeep();
+    return;
+  }
+  if (command === 'on') {
+    state.sound = true;
+    ensureAudio();
+  } else if (command === 'off') {
+    state.sound = false;
+  } else {
+    state.sound = !state.sound;
+    if (state.sound) {
+      ensureAudio();
+    }
+  }
+  print(`[OK] Audio ${state.sound ? 'activado' : 'silenciado'}.`, state.sound ? 'line-success' : 'line-warn');
+  if (state.sound) {
+    playSuccess();
+  }
+  updateHUD();
+  saveState();
+}
+
+/** @param {string[]} args @returns {void} */
+function cmdReset(args) {
+  if (args.length > 0) {
+    print('[i] "reset" no acepta argumentos.', 'line-info');
+  }
+  pendingConfirmation = 'reset';
+  print('', 'line-dim');
+  print('¿Está seguro de reiniciar todo el progreso del juego? [S/N]', 'line-warn', false);
+  print('[!] Se borrarán misiones, traza, correo leído, descargas e historial.', 'line-error');
+  updatePrompt();
+  updateStatusHint();
+}
+
+/** @type {Record<string, CommandSpec>} */
+const COMMANDS = {
+  ls: {
+    name: 'ls',
+    aliases: [],
+    category: 'Navegación',
+    summary: 'Lista archivos y directorios.',
+    usage: 'ls [-a] [-l] [directorio]',
+    description: 'Muestra el contenido del directorio actual o del directorio indicado. En una sesión remota lista el árbol del nodo conectado. Las entradas terminadas en "/" son directorios.',
+    parameters: [
+      '-a  Incluye archivos ocultos que comienzan por punto.',
+      '-l  Formato largo con permisos, tamaño y fecha.',
+      'directorio  Ruta opcional, absoluta o relativa.'
+    ],
+    examples: ['ls', 'ls -la /etc', 'ls /var/log'],
+    seeAlso: ['cd', 'cat', 'pwd'],
+    run: cmdLs
+  },
+  cd: {
+    name: 'cd',
+    aliases: [],
+    category: 'Navegación',
+    summary: 'Cambia el directorio de trabajo.',
+    usage: 'cd [directorio]',
+    description: 'Entra en el directorio indicado. Sin argumentos vuelve al directorio personal. Usa ".." para subir un nivel. En una sesión remota solo navega por el árbol del nodo conectado.',
+    parameters: [
+      'directorio  Ruta destino. Admite rutas absolutas, relativas, "." y "..".',
+      'Sin argumento  Vuelve a ~ en local o a / en remoto.'
+    ],
+    examples: ['cd /var/log', 'cd ..', 'cd /home/ghost'],
+    seeAlso: ['ls', 'pwd', 'disconnect'],
+    run: cmdCd
+  },
+  pwd: {
+    name: 'pwd',
+    aliases: [],
+    category: 'Navegación',
+    summary: 'Muestra la ruta de trabajo actual.',
+    usage: 'pwd',
+    description: 'Imprime la ruta absoluta del directorio actual. Si hay una conexión remota activa, muestra la ruta dentro del nodo remoto con el prefijo remote://.',
+    parameters: [],
+    examples: ['pwd'],
+    seeAlso: ['cd', 'ls'],
+    run: cmdPwd
+  },
+  cat: {
+    name: 'cat',
+    aliases: [],
+    category: 'Navegación',
+    summary: 'Muestra el contenido de un archivo.',
+    usage: 'cat <archivo>',
+    description: 'Lee y muestra un archivo del sistema local o del nodo remoto conectado. También dispara el descubrimiento de credenciales cuando el contrato lo requiere.',
+    parameters: [
+      'archivo  Nombre o ruta del archivo. Puede ser absoluta o relativa.'
+    ],
+    examples: ['cat /etc/hosts', 'cat ~/manifiesto.txt', 'cat /home/operator/access.hash'],
+    seeAlso: ['ls', 'download', 'crack'],
+    run: cmdCat
+  },
+  clear: {
+    name: 'clear',
+    aliases: [],
+    category: 'Sistema',
+    summary: 'Limpia la pantalla de la terminal.',
+    usage: 'clear',
+    description: 'Vacía la salida visible sin alterar el estado del juego, las misiones ni el historial. La salida pendiente de animación también se descarta.',
+    parameters: [],
+    examples: ['clear'],
+    seeAlso: ['status', 'reset'],
+    run: cmdClear
+  },
+  status: {
+    name: 'status',
+    aliases: [],
+    category: 'Sistema',
+    summary: 'Muestra el estado completo de la sesión.',
+    usage: 'status',
+    description: 'Resume operador, directorio, conexión, tema, dificultad, traza, tiempo jugado, misiones, correo, descargas y estadísticas de la sesión.',
+    parameters: [],
+    examples: ['status'],
+    seeAlso: ['trace', 'mail', 'help'],
+    run: cmdStatus
+  },
+  theme: {
+    name: 'theme',
+    aliases: [],
+    category: 'Sistema',
+    summary: 'Cambia la paleta visual de la terminal.',
+    usage: 'theme <ubuntu|cyberpunk>',
+    description: 'Intercambia el tema visual entre el verde fosfórico clásico y la paleta cian neón. La preferencia se guarda automáticamente.',
+    parameters: [
+      'ubuntu  Verde Matrix sobre negro con acentos ámbar.',
+      'cyberpunk  Cian neón, magenta y púrpuras profundos.'
+    ],
+    examples: ['theme ubuntu', 'theme cyberpunk'],
+    seeAlso: ['help', 'status'],
+    run: cmdTheme
+  },
+  sound: {
+    name: 'sound',
+    aliases: [],
+    category: 'Sistema',
+    summary: 'Activa o silencia el audio sintetizado.',
+    usage: 'sound [on|off]',
+    description: 'Controla todos los efectos generados con Web Audio API. Sin argumentos alterna el estado actual. La preferencia se conserva entre sesiones.',
+    parameters: [
+      'on   Activa el audio.',
+      'off  Silencia todos los efectos.',
+      'Sin argumento  Alterna el estado actual.'
+    ],
+    examples: ['sound', 'sound off', 'sound on'],
+    seeAlso: ['credits', 'status'],
+    run: cmdSound
+  },
+  credits: {
+    name: 'credits',
+    aliases: [],
+    category: 'Sistema',
+    summary: 'Muestra la autoría y los créditos técnicos.',
+    usage: 'credits',
+    description: 'Presenta la ficha del proyecto con la autoría de Nayara Bastida (NBR), la versión, las tecnologías usadas y la ausencia de dependencias externas.',
+    parameters: [],
+    examples: ['credits'],
+    seeAlso: ['help', 'status'],
+    run: cmdCredits
+  },
+  help: {
+    name: 'help',
+    aliases: [],
+    category: 'Misiones',
+    summary: 'Lista comandos y muestra ayuda detallada.',
+    usage: 'help [comando]',
+    description: 'Sin argumentos imprime una tabla alineada con todos los comandos y una descripción breve. Con un comando muestra su sinopsis, descripción, parámetros, ejemplos, alias y comandos relacionados.',
+    parameters: [
+      'comando  Nombre opcional del comando sobre el que quieres ayuda.'
+    ],
+    examples: ['help', 'help netscan', 'help mail'],
+    seeAlso: ['tutorial', 'credits'],
+    run: cmdHelp
+  },
+  tutorial: {
+    name: 'tutorial',
+    aliases: [],
+    category: 'Misiones',
+    summary: 'Abre el manual interactivo de la terminal.',
+    usage: 'tutorial',
+    description: 'Guía paso a paso por la interfaz, los comandos básicos, el sistema de correo, las misiones, el rastreo, las condiciones de derrota y la rejugabilidad.',
+    parameters: [],
+    examples: ['tutorial'],
+    seeAlso: ['help', 'mail', 'pista'],
+    run: cmdTutorial
+  },
+  mail: {
+    name: 'mail',
+    aliases: [],
+    category: 'Misiones',
+    summary: 'Abre la bandeja de contratos y encargos.',
+    usage: 'mail | mail read <id>',
+    description: 'Sin argumentos muestra la bandeja de entrada. Con "read" y un identificador abre el mensaje, lo marca como leído y puede iniciar la siguiente misión.',
+    parameters: [
+      'read <id>  Abre el correo indicado. Solo se pueden leer mensajes desbloqueados.'
+    ],
+    examples: ['mail', 'mail read 1', 'mail read 2'],
+    seeAlso: ['pista', 'status'],
+    run: cmdMail
+  },
+  pista: {
+    name: 'pista',
+    aliases: ['hint'],
+    category: 'Misiones',
+    summary: 'Ofrece una pista contextual de la etapa actual.',
+    usage: 'pista | hint',
+    description: 'Analiza la misión y la etapa exacta en la que te encuentras para mostrar la siguiente acción recomendada. También detecta correos sin leer y estados de rastreo elevados.',
+    parameters: [],
+    examples: ['pista', 'hint'],
+    seeAlso: ['mail', 'help', 'trace'],
+    run: cmdPista
+  },
+  netscan: {
+    name: 'netscan',
+    aliases: [],
+    category: 'Hacking',
+    summary: 'Escanea la red y revela nodos vulnerables.',
+    usage: 'netscan',
+    description: 'Lanza un sondeo pasivo. Si tienes un contrato activo revela la IP, alias, puertos y riesgo del nodo objetivo. Incrementa ligeramente la traza.',
+    parameters: [],
+    examples: ['netscan'],
+    seeAlso: ['connect', 'trace', 'mail'],
+    run: cmdNetscan
+  },
+  connect: {
+    name: 'connect',
+    aliases: [],
+    category: 'Hacking',
+    summary: 'Abre una conexión remota con un nodo.',
+    usage: 'connect <ip>',
+    description: 'Establece un túnel con un nodo autorizado. Mientras la conexión permanezca abierta, el rastreo pasivo aumenta. Usa "disconnect" para volver al sistema local.',
+    parameters: [
+      'ip  Dirección IPv4 del nodo descubierto y autorizado por el contrato.'
+    ],
+    examples: ['connect 10.42.0.13', 'connect 172.16.4.20', 'connect 10.0.0.99'],
+    seeAlso: ['netscan', 'disconnect', 'trace'],
+    run: cmdConnect
+  },
+  crack: {
+    name: 'crack',
+    aliases: [],
+    category: 'Hacking',
+    summary: 'Rompe un hash o credencial por fuerza bruta.',
+    usage: 'crack <hash|ip>',
+    description: 'Lanza el motor de fuerza bruta contra la credencial del nodo conectado. Un hash incorrecto incrementa la traza y puede activar el watchdog. También acepta la IP del nodo cuando la etapa lo permite.',
+    parameters: [
+      'hash  Cadena hexadecimal encontrada en un archivo de credenciales.',
+      'ip    Dirección del nodo conectado, como atajo válido en la etapa de crackeo.'
+    ],
+    examples: ['crack 7f3a91c4e8b25d06a1f9c3e77b40d2aa', 'crack 10.42.0.13'],
+    seeAlso: ['cat', 'download', 'trace'],
+    run: cmdCrack
+  },
+  download: {
+    name: 'download',
+    aliases: [],
+    category: 'Hacking',
+    summary: 'Extrae un archivo del nodo remoto al equipo local.',
+    usage: 'download <archivo>',
+    description: 'Copia un archivo remoto a ~/descargas. El archivo objetivo de cada contrato está sellado hasta que se descifra la credencial. Puede resolverse por ruta o por nombre único.',
+    parameters: [
+      'archivo  Ruta remota o nombre único del archivo que quieres extraer.'
+    ],
+    examples: ['download /data/clientes.dat', 'download /vault/esquema.bin', 'download arkhive.dat'],
+    seeAlso: ['connect', 'cat', 'logs'],
+    run: cmdDownload
+  },
+  trace: {
+    name: 'trace',
+    aliases: [],
+    category: 'Hacking',
+    summary: 'Consulta el estado detallado del rastreo.',
+    usage: 'trace',
+    description: 'Muestra el porcentaje de traza, la presión defensiva, la velocidad de rastreo pasivo, el tiempo de bloqueo y el estado de la conexión actual.',
+    parameters: [],
+    examples: ['trace'],
+    seeAlso: ['logs', 'disconnect', 'status'],
+    run: cmdTrace
+  },
+  logs: {
+    name: 'logs',
+    aliases: [],
+    category: 'Hacking',
+    summary: 'Borra huellas y reduce el nivel de traza.',
+    usage: 'logs',
+    description: 'Purga registros locales y remotos. Reduce la traza en 24 puntos y completa la etapa de limpieza del contrato cuando corresponde.',
+    parameters: [],
+    examples: ['logs'],
+    seeAlso: ['trace', 'disconnect', 'download'],
+    run: cmdLogs
+  },
+  disconnect: {
+    name: 'disconnect',
+    aliases: [],
+    category: 'Hacking',
+    summary: 'Cierra la conexión remota y vuelve a local.',
+    usage: 'disconnect',
+    description: 'Cierra el túnel activo, detiene el rastreo pasivo y restaura la navegación local. No borra registros ni reduce automáticamente la traza.',
+    parameters: [],
+    examples: ['disconnect'],
+    seeAlso: ['connect', 'logs', 'trace'],
+    run: cmdDisconnect
+  },
+  reset: {
+    name: 'reset',
+    aliases: [],
+    category: 'Control',
+    summary: 'Reinicia la partida con confirmación explícita.',
+    usage: 'reset',
+    description: 'Solicita confirmación con la pregunta "¿Está seguro de reiniciar todo el progreso del juego? [S/N]". Si respondes S, borra misiones, traza, correo, descargas e historial y comienza de cero con la dificultad actual.',
+    parameters: [],
+    examples: ['reset'],
+    seeAlso: ['status', 'help'],
+    run: cmdReset
+  }
+};
+
+/** @param {string} token @returns {CommandSpec|undefined} */
+function findCommand(token) {
+  const name = token.toLowerCase();
+  const direct = COMMANDS[name];
+  if (direct) {
+    return direct;
+  }
+  return Object.values(COMMANDS).find((spec) => spec.aliases.includes(name));
+}
+
+/** @param {string} input @returns {string[]} */
+function parseCommand(input) {
+  /** @type {string[]} */
+  const tokens = [];
+  let current = '';
+  let quote = '';
+  let escaped = false;
+  for (const character of input) {
+    if (escaped) {
+      current += character;
+      escaped = false;
+      continue;
+    }
+    if (character === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) {
+        quote = '';
+      } else {
+        current += character;
+      }
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (/\s/.test(character)) {
+      if (current) {
+        tokens.push(current);
+        current = '';
+      }
+      continue;
+    }
+    current += character;
+  }
+  if (current) {
+    tokens.push(current);
+  }
+  return tokens;
+}
+
+/** @param {string} raw @returns {void} */
+function addHistoryEntry(raw) {
+  const cleaned = raw.trim();
+  if (!cleaned) {
+    return;
+  }
+  state.history.push(cleaned);
+  if (state.history.length > HISTORY_LIMIT) {
+    state.history.splice(0, state.history.length - HISTORY_LIMIT);
+  }
+  historyCursor = -1;
+  historyDraft = '';
+}
+
+/** @param {string} raw @returns {void} */
+function executeCommand(raw) {
+  const line = raw.trim();
+  if (!line) {
+    return;
+  }
+  flushOutput();
+  addHistoryEntry(line);
+  const tokens = parseCommand(line);
+  if (tokens.length === 0) {
+    return;
+  }
+  const commandToken = tokens[0] ?? '';
+  const spec = findCommand(commandToken);
+  state.stats.commands += 1;
+  if (!spec) {
+    state.stats.errors += 1;
+    print(`[ERROR] Comando no reconocido: ${commandToken}`, 'line-error');
+    print('Ejecuta "help" para consultar los comandos disponibles.', 'line-info');
+    glitch();
+    playErrorBeep();
+    addTrace(2, 'comando no reconocido');
+    updateHUD();
+    saveState();
+    return;
+  }
+  try {
+    spec.run(tokens.slice(1));
+  } catch (error) {
+    state.stats.errors += 1;
+    const detail = error instanceof Error ? error.message : 'Fallo desconocido.';
+    print(`[ERROR] Fallo interno al ejecutar ${spec.name}: ${detail}`, 'line-error');
+    print('La sesión sigue activa. Revisa el comando con "help".', 'line-info');
+    glitch();
+    playErrorBeep();
+    updateHUD();
+    saveState();
+  }
+  updateHUD();
+  saveState();
+  if (booted && !isLocked()) {
+    inputEl.focus();
+  }
+}
+
+/** @param {string} raw @returns {void} */
+function handleConfirmation(raw) {
+  const answer = raw.trim().toLowerCase();
+  if (!answer) {
+    print('[!] Escribe S para confirmar o N para cancelar.', 'line-warn');
+    return;
+  }
+  if (answer === 's' || answer === 'si' || answer === 'sí') {
+    pendingConfirmation = '';
+    inputEl.value = '';
+    startNewGame(state.difficulty);
+    return;
+  }
+  if (answer === 'n' || answer === 'no') {
+    pendingConfirmation = '';
+    print('[OK] Reinicio cancelado. El progreso se conserva.', 'line-info');
+    playTone({ freq: 330, duration: 0.08, type: 'sine', gain: 0.03 });
+    updatePrompt();
+    updateStatusHint();
+    saveState();
+    inputEl.focus();
+    return;
+  }
+  print('[ERROR] Respuesta no válida. Escribe S para reiniciar o N para cancelar.', 'line-error');
+  playErrorBeep();
+}
+
+let historyCursor = -1;
+let historyDraft = '';
+
+/** @param {number} direction @returns {void} */
+function navigateHistory(direction) {
+  if (state.history.length === 0) {
+    return;
+  }
+  if (direction < 0) {
+    if (historyCursor === -1) {
+      historyDraft = inputEl.value;
+      historyCursor = state.history.length - 1;
+    } else if (historyCursor > 0) {
+      historyCursor -= 1;
+    }
+    inputEl.value = state.history[historyCursor] ?? '';
+  } else {
+    if (historyCursor === -1) {
+      return;
+    }
+    if (historyCursor < state.history.length - 1) {
+      historyCursor += 1;
+      inputEl.value = state.history[historyCursor] ?? '';
+    } else {
+      historyCursor = -1;
+      inputEl.value = historyDraft;
+    }
+  }
+  const length = inputEl.value.length;
+  inputEl.setSelectionRange(length, length);
+}
+
+/**
+ * @typedef {Object} CompletionItem
+ * @property {string} value
+ * @property {boolean} isDir
+ * @typedef {Object} CompletionContext
+ * @property {string} token
+ * @property {number} tokenStart
+ * @property {string[]} parts
+ */
+
+/** @returns {CompletionContext} */
+function getCompletionContext() {
+  const value = inputEl.value;
+  const position = inputEl.selectionStart ?? value.length;
+  const before = value.slice(0, position);
+  const match = /(\S*)$/.exec(before);
+  const token = match ? match[1] ?? '' : '';
+  const tokenStart = position - token.length;
+  const leading = before.slice(0, tokenStart);
+  const parts = leading.trim() === '' ? [] : leading.trim().split(/\s+/);
+  return { token, tokenStart, parts };
+}
+
+/** @param {string} token @param {string[]} injected @returns {CompletionItem[]} */
+function mergeCompletionItems(token, injected) {
+  const seen = new Set();
+  /** @type {CompletionItem[]} */
+  const items = [];
+  const lowerToken = token.toLowerCase();
+  for (const value of injected) {
+    if (!value || seen.has(value)) {
+      continue;
+    }
+    seen.add(value);
+    items.push({ value, isDir: value.endsWith('/') });
+  }
+  return items.filter((item) => item.value.toLowerCase().startsWith(lowerToken));
+}
+
+/** @param {string} kind @param {string} token @returns {CompletionItem[]} */
+function getPathCompletions(kind, token) {
+  const remote = isRemoteSession();
+  if (kind === 'download' && !remote) {
+    return [];
+  }
+  const root = getCurrentVfs();
+  const slash = token.lastIndexOf('/');
+  const dirPart = slash >= 0 ? token.slice(0, slash + 1) : '';
+  const namePart = slash >= 0 ? token.slice(slash + 1) : token;
+  const baseParts = resolvePath(dirPart || '.', getCurrentCwd(), remote);
+  const directory = getVfsNode(root, baseParts);
+  if (!directory || directory.type !== 'dir') {
+    return [];
+  }
+  /** @type {CompletionItem[]} */
+  const items = [];
+  for (const [name, node] of Object.entries(directory.children)) {
+    if (node.hidden && !namePart.startsWith('.')) {
+      continue;
+    }
+    if (!name.startsWith(namePart)) {
+      continue;
+    }
+    if (kind === 'cd' && node.type !== 'dir') {
+      continue;
+    }
+    if ((kind === 'cat' || kind === 'download') && node.type !== 'file') {
+      continue;
+    }
+    const suffix = node.type === 'dir' ? '/' : '';
+    items.push({ value: `${dirPart}${name}${suffix}`, isDir: node.type === 'dir' });
+  }
+  items.sort((left, right) => left.value.localeCompare(right.value, 'es'));
+  return items;
+}
+
+/** @returns {CompletionItem[]} */
+function getCompletionItems() {
+  const context = getCompletionContext();
+  const token = context.token;
+  if (context.parts.length === 0) {
+    /** @type {string[]} */
+    const names = [];
+    for (const spec of Object.values(COMMANDS)) {
+      names.push(spec.name, ...spec.aliases);
+    }
+    return mergeCompletionItems(token, names).sort((left, right) => left.value.localeCompare(right.value, 'es'));
+  }
+  const commandName = (context.parts[0] ?? '').toLowerCase();
+  if (commandName === 'theme') {
+    return mergeCompletionItems(token, Object.keys(THEMES));
+  }
+  if (commandName === 'sound') {
+    return mergeCompletionItems(token, ['on', 'off']);
+  }
+  if (commandName === 'help') {
+    return mergeCompletionItems(token, Object.values(COMMANDS).map((spec) => spec.name));
+  }
+  if (commandName === 'mail') {
+    if (context.parts.length === 1) {
+      return mergeCompletionItems(token, ['read']);
+    }
+    if ((context.parts[1] ?? '').toLowerCase() === 'read' && context.parts.length === 2) {
+      return mergeCompletionItems(token, MAILS
+        .filter((message) => message.id <= state.mail.unlocked)
+        .map((message) => String(message.id)));
+    }
+    return [];
+  }
+  if (commandName === 'connect') {
+    /** @type {string[]} */
+    const addresses = [...state.files.discovered];
+    const active = getActiveMission();
+    if (active) {
+      addresses.push(active.ip);
+    }
+    return mergeCompletionItems(token, addresses);
+  }
+  if (commandName === 'crack') {
+    const info = state.connectedIp ? NODE_INFO[state.connectedIp] : undefined;
+    if (!info) {
+      return [];
+    }
+    const mission = getMission(info.missionId);
+    const progress = state.missions[mission.id];
+    const expected = mission.stages[progress.stage];
+    if (expected?.id === 'crack') {
+      return mergeCompletionItems(token, [mission.hash]);
+    }
+    if (expected?.id === 'crack2' && mission.hash2) {
+      return mergeCompletionItems(token, [mission.hash2]);
+    }
+    return [];
+  }
+  if (commandName === 'ls') {
+    if (token.startsWith('-')) {
+      return mergeCompletionItems(token, ['-a', '-l', '-al', '-la']);
+    }
+    return getPathCompletions('ls', token);
+  }
+  if (commandName === 'cd') {
+    return getPathCompletions('cd', token);
+  }
+  if (commandName === 'cat') {
+    return getPathCompletions('cat', token);
+  }
+  if (commandName === 'download') {
+    return getPathCompletions('download', token);
+  }
+  return [];
+}
+
+/** @param {string} left @param {string} right @returns {string} */
+function longestCommonPrefix(left, right) {
+  const max = Math.min(left.length, right.length);
+  let index = 0;
+  while (index < max && left[index] === right[index]) {
+    index += 1;
+  }
+  return left.slice(0, index);
+}
+
+let tabCycleValue = '';
+let tabCycleToken = '';
+let tabCycleStart = -1;
+let tabCycleItems = /** @type {CompletionItem[]} */ ([]);
+let tabCycleIndex = -1;
+
+/** @param {CompletionItem} item @param {CompletionContext} context @returns {void} */
+function applyCompletion(item, context) {
+  const insertion = item.isDir ? item.value : `${item.value} `;
+  const value = inputEl.value;
+  const next = `${value.slice(0, context.tokenStart)}${insertion}${value.slice(context.tokenStart + context.token.length)}`;
+  inputEl.value = next;
+  const cursor = context.tokenStart + insertion.length;
+  inputEl.setSelectionRange(cursor, cursor);
+}
+
+/** @returns {void} */
+function handleTabCompletion() {
+  if (!booted || isLocked()) {
+    return;
+  }
+  const context = getCompletionContext();
+  const items = getCompletionItems();
+  if (items.length === 0) {
+    playTone({ freq: 180, duration: 0.04, type: 'square', gain: 0.02 });
+    return;
+  }
+  const signature = `${inputEl.value}|${context.tokenStart}|${context.token}`;
+  if (signature === `${tabCycleValue}|${tabCycleStart}|${tabCycleToken}` && tabCycleItems.length > 0) {
+    tabCycleIndex = tabCycleIndex < 0 ? 0 : (tabCycleIndex + 1) % tabCycleItems.length;
+    const selected = tabCycleItems[tabCycleIndex];
+    if (selected) {
+      applyCompletion(selected, context);
+      playKeyClick();
+    }
+    return;
+  }
+  if (items.length === 1) {
+    const only = items[0];
+    if (only) {
+      applyCompletion(only, context);
+      playKeyClick();
+    }
+    tabCycleIndex = -1;
+    return;
+  }
+  let common = items[0]?.value ?? '';
+  for (const item of items.slice(1)) {
+    common = longestCommonPrefix(common, item.value);
+  }
+  if (common.length > context.token.length) {
+    applyCompletion({ value: common, isDir: common.endsWith('/') }, context);
+    tabCycleIndex = -1;
+    playKeyClick();
+    return;
+  }
+  tabCycleValue = inputEl.value;
+  tabCycleToken = context.token;
+  tabCycleStart = context.tokenStart;
+  tabCycleItems = items;
+  tabCycleIndex = -1;
+  const preview = items.slice(0, 12).map((item) => item.value).join('   ');
+  print(`[TAB] ${preview}${items.length > 12 ? `   ... (+${items.length - 12})` : ''}`, 'line-info', false);
+  playTone({ freq: 420, duration: 0.03, type: 'square', gain: 0.014 });
+}
+
+/** @type {{title:string, html:string}[]} */
+const TUTORIAL_PAGES = [
+  {
+    title: 'Bienvenido a NEON//BREACH',
+    html: `<h3>Bienvenido a NEON//BREACH</h3>
+      <p>Eres <strong>ghost</strong>, un operador clandestino conectado a la red NBR. Has recibido tres contratos para infiltrar nodos corporativos, descifrar credenciales y extraer datos antes de que la red te rastree.</p>
+      <p>La terminal es tu única interfaz. Todo lo que ocurre se escribe, se guarda y deja una huella. La firma del sistema es <strong>NBR — Nayara Bastida</strong>.</p>
+      <ul>
+        <li>Objetivo: completar los tres contratos.</li>
+        <li>Riesgo: si la traza alcanza el 100%, la red bloqueará la terminal.</li>
+        <li>Progreso: se guarda automáticamente en este navegador.</li>
+      </ul>
+      <div class="callout">Puedes abrir este manual en cualquier momento con el comando <code>tutorial</code>.</div>`
+  },
+  {
+    title: 'La terminal',
+    html: `<h3>La terminal</h3>
+      <p>Escribe un comando y pulsa <code>Enter</code>. La salida aparece en el panel principal. Los errores hacen parpadear la pantalla y pueden subir la traza.</p>
+      <ul>
+        <li><code>TAB</code> autocompleta comandos, rutas, temas, correos e IPs descubiertas.</li>
+        <li><code>↑</code> y <code>↓</code> recorren el historial de comandos.</li>
+        <li><code>Enter</code> acelera la salida pendiente de animación.</li>
+        <li><code>help</code> muestra la tabla de comandos; <code>help comando</code> abre su manual.</li>
+        <li><code>clear</code> limpia la pantalla; <code>status</code> resume la sesión.</li>
+        <li><code>theme ubuntu</code> o <code>theme cyberpunk</code> cambia la paleta.</li>
+      </ul>
+      <div class="callout">El HUD superior muestra traza, tema, dificultad, progreso, tiempo y sonido. Puedes pulsar el tema o el sonido para cambiarlos.</div>`
+  },
+  {
+    title: 'Correo y contratos',
+    html: `<h3>Correo y contratos</h3>
+      <p>Los encargos llegan por correo. Ejecuta <code>mail</code> para ver la bandeja y <code>mail read &lt;id&gt;</code> para abrir un contrato. Leer el mensaje inicia la misión y desbloquea su primera etapa.</p>
+      <ul>
+        <li>Los correos nuevos aparecen marcados como <strong>NUEVO</strong>.</li>
+        <li>Al completar una misión se desbloquea el siguiente contrato.</li>
+        <li><code>pista</code> o <code>hint</code> muestra la siguiente acción exacta según tu etapa.</li>
+        <li><code>status</code> muestra la misión actual y el progreso global.</li>
+      </ul>
+      <div class="callout">No puedes leer un correo bloqueado. Si no sabes qué hacer, abre el correo pendiente y usa <code>pista</code>.</div>`
+  },
+  {
+    title: 'Hacking y operaciones',
+    html: `<h3>Hacking y operaciones</h3>
+      <p>La secuencia habitual de un contrato es: escanear, conectar, localizar el hash, descifrarlo, descargar y limpiar los logs.</p>
+      <ul>
+        <li><code>netscan</code> revela nodos, puertos y riesgos.</li>
+        <li><code>connect &lt;ip&gt;</code> abre un túnel remoto; <code>disconnect</code> lo cierra.</li>
+        <li><code>ls</code>, <code>cd</code>, <code>pwd</code> y <code>cat</code> exploran el sistema local o remoto.</li>
+        <li><code>crack &lt;hash|ip&gt;</code> rompe una credencial. Un fallo sube mucho la traza.</li>
+        <li><code>download &lt;archivo&gt;</code> copia datos a <code>~/descargas</code>.</li>
+        <li><code>logs</code> borra huellas y reduce la traza.</li>
+      </ul>
+      <div class="callout">Mientras haya una conexión remota activa, la traza sube sola. No permanezcas conectado más de lo necesario.</div>`
+  },
+  {
+    title: 'Traza, bloqueo y derrota',
+    html: `<h3>Traza, bloqueo y derrota</h3>
+      <p>La traza es el porcentaje de identificación de tu sesión. Sube al conectar, escanear, descargar, fallar un crack o ejecutar comandos inválidos. La barra del HUD y el comando <code>trace</code> muestran su estado.</p>
+      <ul>
+        <li>A partir del 75% suena la alarma y la pantalla se vuelve crítica.</li>
+        <li>Al 100% se activa un bloqueo de 30, 45 o 60 segundos según la dificultad.</li>
+        <li>Durante el bloqueo no puedes escribir comandos.</li>
+        <li>Al liberar, la presión defensiva sube: el rastreo pasivo se acelera.</li>
+        <li><code>logs</code> reduce la traza; <code>disconnect</code> detiene el rastreo pasivo.</li>
+      </ul>
+      <div class="callout">El progreso de las misiones se conserva tras un bloqueo, pero el juego se vuelve más peligroso.</div>`
+  },
+  {
+    title: 'Victoria, reinicio y persistencia',
+    html: `<h3>Victoria, reinicio y persistencia</h3>
+      <p>Al completar el tercer contrato recibirás un correo final y la pantalla de victoria. Desde allí puedes volver a jugar eligiendo <strong>Fácil</strong>, <strong>Normal</strong> o <strong>Difícil</strong>.</p>
+      <ul>
+        <li><code>reset</code> pide confirmación explícita con <code>S</code> o <code>N</code>.</li>
+        <li>El estado se guarda tras cada comando y cada pocos segundos.</li>
+        <li>Se conservan tema, sonido y tutorial visto; se reinician misiones, traza, correo e historial.</li>
+        <li>La dificultad cambia la velocidad de rastreo y la duración del bloqueo.</li>
+      </ul>
+      <div class="callout">La red recuerda cada comando. Tú decides cuándo desaparecer. — Nayara Bastida (NBR)</div>`
+  }
+];
+
+let tutorialPage = 0;
+let tutorialOpen = false;
+
+/** @returns {void} */
+function renderTutorialPage() {
+  const page = TUTORIAL_PAGES[tutorialPage];
+  if (!page) {
+    return;
+  }
+  tutorialContent.innerHTML = page.html;
+  tutorialDots.replaceChildren();
+  for (let index = 0; index < TUTORIAL_PAGES.length; index += 1) {
+    const dot = document.createElement('span');
+    if (index === tutorialPage) {
+      dot.classList.add('active');
+    }
+    tutorialDots.appendChild(dot);
+  }
+  tutorialPrev.toggleAttribute('disabled', tutorialPage === 0);
+  tutorialNext.textContent = tutorialPage === TUTORIAL_PAGES.length - 1 ? 'FINALIZAR' : 'SIGUIENTE';
+}
+
+/** @returns {void} */
+function openTutorial() {
+  tutorialOpen = true;
+  tutorialPage = 0;
+  renderTutorialPage();
+  tutorialOverlay.classList.remove('hidden');
+  victoryOverlay.classList.add('hidden');
+  if (booted) {
+    inputEl.disabled = true;
+  }
+  tutorialNext.focus();
+}
+
+/** @returns {void} */
+function closeTutorial() {
+  tutorialOpen = false;
+  tutorialOverlay.classList.add('hidden');
+  state.tutorialSeen = true;
+  saveState();
+  restoreInputFocus();
+}
+
+/** @returns {void} */
+function restoreInputFocus() {
+  if (!booted || isLocked() || tutorialOpen || !victoryOverlay.classList.contains('hidden')) {
+    return;
+  }
+  inputEl.disabled = false;
+  inputEl.focus();
+}
+
+/** @returns {void} */
+function showVictoryOverlay() {
+  if (!booted || isLocked() || completedMissions() !== MISSIONS.length) {
+    return;
+  }
+  tutorialOpen = false;
+  tutorialOverlay.classList.add('hidden');
+  state.victoryShown = true;
+  victoryStats.replaceChildren();
+  const stats = [
+    ['Tiempo total', formatClock(getElapsedMs())],
+    ['Traza final', `${Math.round(state.trace)}%`],
+    ['Bloqueos', String(state.stats.locks)],
+    ['Comandos', String(state.stats.commands)],
+    ['Hashes roto', String(state.stats.cracked)],
+    ['Dificultad', DIFFICULTIES[state.difficulty].label]
+  ];
+  for (const [label, value] of stats) {
+    const box = document.createElement('div');
+    box.className = 'victory-stat';
+    const labelEl = document.createElement('span');
+    labelEl.textContent = label;
+    const valueEl = document.createElement('strong');
+    valueEl.textContent = value;
+    box.append(labelEl, valueEl);
+    victoryStats.appendChild(box);
+  }
+  victoryOverlay.classList.remove('hidden');
+  inputEl.disabled = true;
+  updateHUD();
+  saveState();
+}
+
+/** @returns {void} */
+function hideVictoryOverlay() {
+  victoryOverlay.classList.add('hidden');
+  restoreInputFocus();
+}
+
+/** @param {DifficultyName} difficulty @returns {void} */
+function startNewGame(difficulty) {
+  const previousTheme = state.theme;
+  const previousSound = state.sound;
+  const tutorialSeen = state.tutorialSeen;
+  clearOutput();
+  state = createInitialState();
+  state.theme = previousTheme;
+  state.sound = previousSound;
+  state.tutorialSeen = tutorialSeen;
+  state.difficulty = difficulty;
+  state.booted = true;
+  state.traceWarnLevel = 0;
+  booted = true;
+  pendingConfirmation = '';
+  historyCursor = -1;
+  historyDraft = '';
+  timerRunning = true;
+  timerAnchor = Date.now();
+  inputEl.value = '';
+  inputEl.disabled = false;
+  bootOverlay.classList.add('hidden');
+  tutorialOverlay.classList.add('hidden');
+  victoryOverlay.classList.add('hidden');
+  lockOverlay.classList.add('hidden');
+  toastContainer.replaceChildren();
+  tutorialOpen = false;
+  applyTheme(previousTheme);
+  updateHUD();
+  printBanner(false, true);
+  playFanfare();
+  showToast(`Nueva partida iniciada en dificultad ${DIFFICULTIES[difficulty].label}.`, 'success');
+  saveState();
+  inputEl.focus();
+}
+
+/** @param {boolean} restored @param {boolean} fresh @returns {void} */
+function printBanner(restored, fresh) {
+  printAscii(ASCII_BANNER.replace(/^\n/, '').replace(/\s+$/, ''));
+  print('');
+  print('N E O N // B R E A C H  ·  TERMINAL DE INTRUSIÓN CIBERPUNK', 'line-title');
+  print('v1.0 · Desarrollado por Nayara Bastida (NBR)', 'line-accent');
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+  if (fresh) {
+    print(`[SISTEMA] Nueva partida iniciada. Dificultad: ${DIFFICULTIES[state.difficulty].label}.`, 'line-success');
+    print(`[SISTEMA] ${DIFFICULTIES[state.difficulty].brief}`, 'line-info');
+    print('[SISTEMA] Un contrato nuevo espera en tu bandeja de entrada.', 'line-info');
+  } else if (restored) {
+    print('[SISTEMA] Sesión restaurada desde el almacenamiento local.', 'line-success');
+    print(`[ESTADO] Traza ${Math.round(state.trace)}% · ${completedMissions()}/${MISSIONS.length} misiones · ${formatClock(getElapsedMs())} de juego.`, 'line-info');
+    if (isLocked()) {
+      print('[ESTADO] Contención de seguridad aún activa. Espera a que termine la cuenta regresiva.', 'line-warn');
+    }
+  } else {
+    print('[SISTEMA] Identidad aceptada: ghost // NBR-NET.', 'line-success');
+    print('La red es una simulación. No hay conexiones reales, pero cada decisión cuenta.', 'line-info');
+  }
+  print('');
+  print("Ejecuta 'tutorial' para aprender a jugar, 'help' para ver la lista de comandos con sus descripciones, o 'mail' para revisar tus encargos.", 'line-warn');
+  print('');
+  const active = getActiveMission();
+  if (active) {
+    const progress = state.missions[active.id];
+    print(`[MISIÓN] ${active.title} · etapa ${Math.min(progress.stage + 1, active.stages.length)}/${active.stages.length}. Usa "pista" si necesitas ayuda.`, 'line-accent');
+  } else {
+    const next = getNextMission();
+    if (next) {
+      print(`[MISIÓN] Contrato disponible: ${next.title}. Abre "mail" y busca el mensaje #${next.mailId}.`, 'line-accent');
+    } else {
+      print('[MISIÓN] Todos los contratos completados. La red es tuya.', 'line-success');
+    }
+  }
+  if (unreadMailCount() > 0) {
+    print(`[CORREO] Tienes ${unreadMailCount()} mensaje(s) sin leer.`, 'line-mail');
+  }
+  if (storageWarning) {
+    print(`[AVISO] ${storageWarning}`, 'line-error');
+  }
+  print('══════════════════════════════════════════════════════════', 'line-dim');
+}
+
+/** @returns {void} */
+function toggleSoundFromHud() {
+  state.sound = !state.sound;
+  if (state.sound) {
+    ensureAudio();
+    playSuccess();
+  }
+  if (booted) {
+    print(`[AUDIO] ${state.sound ? 'Sonido activado.' : 'Sonido silenciado.'}`, state.sound ? 'line-success' : 'line-warn');
+  }
+  updateHUD();
+  saveState();
+}
+
+/** @returns {void} */
+function toggleThemeFromHud() {
+  const next = state.theme === 'ubuntu' ? 'cyberpunk' : 'ubuntu';
+  applyTheme(next);
+  if (booted) {
+    print(`[TEMA] Paleta cambiada a ${THEMES[next].label}.`, 'line-accent');
+  }
+  playTone({ freq: next === 'cyberpunk' ? 660 : 440, duration: 0.08, type: 'triangle', gain: 0.03 });
+  saveState();
+}
+
+/** @returns {void} */
+function startSession() {
+  if (booted) {
+    return;
+  }
+  ensureAudio();
+  booted = true;
+  state.booted = true;
+  state.traceWarnLevel = traceBand(state.trace);
+  bootOverlay.classList.add('hidden');
+  timerRunning = true;
+  timerAnchor = Date.now();
+  printBanner(hadSave, false);
+  updateHUD();
+  if (state.lockUntil > 0) {
+    if (isLocked()) {
+      inputEl.disabled = true;
+      lockOverlay.classList.remove('hidden');
+      updateLockUi();
+    } else {
+      completeLockdown();
+    }
+  } else if (state.trace >= 100) {
+    beginLockdown('rastreo pendiente de contención');
+  } else {
+    inputEl.disabled = false;
+  }
+  updateHUD();
+  saveState();
+  if (!isLocked()) {
+    inputEl.focus();
+  }
+}
+
+const matrixContext = matrixCanvas.getContext('2d');
+const MATRIX_GLYPHS = '0123456789ABCDEFabcdef<>/\\[]{}#$%&@';
+let matrixDrops = [];
+
+/** @returns {void} */
+function resizeMatrix() {
+  if (!matrixContext) {
+    return;
+  }
+  matrixCanvas.width = window.innerWidth;
+  matrixCanvas.height = window.innerHeight;
+  const columns = Math.max(1, Math.ceil(matrixCanvas.width / 16));
+  matrixDrops = Array.from({ length: columns }, () => Math.random() * (matrixCanvas.height / 16));
+}
+
+/** @returns {void} */
+function drawMatrix() {
+  if (!matrixContext || reducedMotion || document.hidden) {
+    return;
+  }
+  matrixContext.fillStyle = 'rgba(0, 0, 0, 0.09)';
+  matrixContext.fillRect(0, 0, matrixCanvas.width, matrixCanvas.height);
+  matrixContext.font = '14px monospace';
+  matrixContext.fillStyle = THEMES[state.theme].matrix;
+  for (let index = 0; index < matrixDrops.length; index += 1) {
+    const glyph = MATRIX_GLYPHS[Math.floor(Math.random() * MATRIX_GLYPHS.length)] ?? '0';
+    const x = index * 16;
+    const y = (matrixDrops[index] ?? 0) * 16;
+    matrixContext.fillText(glyph, x, y);
+    if (y > matrixCanvas.height && Math.random() > 0.975) {
+      matrixDrops[index] = 0;
+    } else {
+      matrixDrops[index] = (matrixDrops[index] ?? 0) + 1;
+    }
+  }
+}
+
+let tickCounter = 0;
+
+/** @returns {void} */
+function gameTick() {
+  if (!booted) {
+    return;
+  }
+  tickCounter += 1;
+  if (state.lockUntil > 0) {
+    if (Date.now() >= state.lockUntil) {
+      completeLockdown();
+    } else {
+      updateLockUi();
+      if (tickCounter % 2 === 0) {
+        playAlarm();
+      }
+    }
+    updateHUD();
+    return;
+  }
+  const overlayPaused = tutorialOpen || !victoryOverlay.classList.contains('hidden');
+  if (!overlayPaused && tickCounter % 2 === 0) {
+    passiveTraceTick();
+  }
+  if (!overlayPaused && tickCounter % 4 === 0 && state.trace >= 75) {
+    playAlarm();
+  }
+  if (tickCounter % 5 === 0) {
+    saveState();
+  }
+  updateHUD();
+}
+
+/** @returns {void} */
+function initUI() {
+  bootstrapAscii();
+  updateHUD();
+  if (hadSave) {
+    bootButton.textContent = 'CONTINUAR SESIÓN';
+    const lockText = isLocked() ? ' // contención pendiente' : '';
+    bootStatus.textContent = `Sesión local detectada. Dificultad ${DIFFICULTIES[state.difficulty].label}, progreso ${missionProgress()}%, traza ${Math.round(state.trace)}% y ${formatClock(getElapsedMs())} de juego${lockText}. Pulsa para restaurar la terminal y habilitar el audio.`;
+  } else {
+    bootButton.textContent = 'INICIAR SESIÓN';
+    bootStatus.textContent = 'Nueva sesión preparada. Pulsa para inicializar la terminal, desbloquear el audio sintetizado y recibir tu primer contrato.';
+  }
+  if (storageWarning) {
+    bootStatus.textContent = `${bootStatus.textContent} AVISO: ${storageWarning}`;
+  }
+  if (!storageAvailable) {
+    bootButton.textContent = hadSave ? 'CONTINUAR SIN GUARDADO' : 'INICIAR SIN GUARDADO';
+  }
+  bootButton.focus();
+}
+
+/** @returns {void} */
+function bootstrapAscii() {
+  const art = ASCII_BANNER.replace(/^\n/, '').replace(/\s+$/, '');
+  bootAscii.textContent = art;
+}
+
+/** @returns {void} */
+function bindEvents() {
+  bootButton.addEventListener('click', startSession);
+  inputForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!booted || isLocked()) {
+      return;
+    }
+    const raw = inputEl.value;
+    inputEl.value = '';
+    if (pendingConfirmation) {
+      handleConfirmation(raw);
+      return;
+    }
+    historyCursor = -1;
+    historyDraft = '';
+    executeCommand(raw);
+  });
+  inputEl.addEventListener('keydown', (event) => {
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      handleTabCompletion();
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      navigateHistory(-1);
+      playKeyClick();
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      navigateHistory(1);
+      playKeyClick();
+      return;
+    }
+    if (event.key === 'Escape') {
+      if (renderQueue.length > 0 || outputBusy) {
+        fastForward = true;
+      }
+      return;
+    }
+    if (event.ctrlKey && event.key.toLowerCase() === 'l') {
+      event.preventDefault();
+      clearOutput();
+      return;
+    }
+    if (event.key.length === 1 || event.key === 'Backspace' || event.key === 'Enter') {
+      playKeyClick();
+    }
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') {
+      return;
+    }
+    if (tutorialOpen) {
+      event.preventDefault();
+      closeTutorial();
+    } else if (!victoryOverlay.classList.contains('hidden')) {
+      event.preventDefault();
+      hideVictoryOverlay();
+    }
+  });
+  terminalEl.addEventListener('click', (event) => {
+    const target = event.target;
+    if (target instanceof HTMLButtonElement || target instanceof HTMLInputElement) {
+      return;
+    }
+    if (window.getSelection()?.toString()) {
+      return;
+    }
+    if (!booted || isLocked()) {
+      return;
+    }
+    if (!tutorialOverlay.classList.contains('hidden') || !victoryOverlay.classList.contains('hidden')) {
+      return;
+    }
+    inputEl.focus();
+  });
+  themeChip.addEventListener('click', toggleThemeFromHud);
+  soundChip.addEventListener('click', toggleSoundFromHud);
+  tutorialClose.addEventListener('click', closeTutorial);
+  tutorialPrev.addEventListener('click', () => {
+    if (tutorialPage > 0) {
+      tutorialPage -= 1;
+      renderTutorialPage();
+    }
+  });
+  tutorialNext.addEventListener('click', () => {
+    if (tutorialPage < TUTORIAL_PAGES.length - 1) {
+      tutorialPage += 1;
+      renderTutorialPage();
+    } else {
+      closeTutorial();
+    }
+  });
+  victoryClose.addEventListener('click', hideVictoryOverlay);
+  const difficultyButtons = document.querySelectorAll('[data-difficulty]');
+  for (const button of difficultyButtons) {
+    button.addEventListener('click', () => {
+      const value = button.getAttribute('data-difficulty');
+      if (value === 'facil' || value === 'normal' || value === 'dificil') {
+        ensureAudio();
+        startNewGame(value);
+      }
+    });
+  }
+  window.addEventListener('resize', resizeMatrix);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      saveState();
+    } else {
+      timerAnchor = Date.now() - (getElapsedMs() - state.elapsedMs);
+      updateHUD();
+    }
+  });
+  window.addEventListener('pagehide', saveState);
+  window.addEventListener('beforeunload', saveState);
+}
+
+/** @returns {void} */
+function init() {
+  state = loadState();
+  state.traceWarnLevel = traceBand(state.trace);
+  applyTheme(state.theme);
+  bindEvents();
+  initUI();
+  resizeMatrix();
+  window.setInterval(drawMatrix, 82);
+  window.setInterval(gameTick, 1000);
+  if (storageWarning) {
+    showToast(storageWarning, 'error');
+  }
+}
+
+init();
+
+
+
+
+
+
+</script>
+</body>
+</html>
